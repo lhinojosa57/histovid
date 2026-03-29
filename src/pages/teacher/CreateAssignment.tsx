@@ -216,7 +216,7 @@ export default function CreateAssignment() {
           <div>
             <label className="label-style">URL del video *</label>
             <input value={form.video_url} onChange={e => setForm(f => ({ ...f, video_url: e.target.value }))} placeholder="https://www.youtube.com/watch?v=… o https://vimeo.com/…" className="input-style w-full font-mono text-sm" />
-            <p className="text-xs text-ink-400 mt-1.5 font-body">Compatible con YouTube, Vimeo, y videos directos (mp4)</p>
+            <p className="text-xs text-ink-400 mt-1.5 font-body">Compatible con YouTube, Vimeo, Google Drive y videos directos (mp4). Para Google Drive: clic derecho → Obtener enlace → "Cualquiera con el enlace"</p>
           </div>
         </div>
 
