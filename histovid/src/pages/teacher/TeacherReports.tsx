@@ -28,9 +28,24 @@ export default function TeacherReports() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!profile) return
+    if (!profile?.id) return
     async function load() {
-      // Get all sessions for teacher's assignments
+      const { data: myAssignments } = await supabase
+        .from('video_assignments')
+        .select('id, title')
+        .eq('teacher_id', profile!.id)
+        .order('created_at', { ascending: false })
+
+      const assignmentIds = (myAssignments ?? []).map((a: any) => a.id)
+      setAssignments(myAssignments ?? [])
+
+      if (assignmentIds.length === 0) {
+        setRows([])
+        setFiltered([])
+        setLoading(false)
+        return
+      }
+
       const { data: sessions } = await supabase
         .from('student_sessions')
         .select(`
@@ -38,10 +53,7 @@ export default function TeacherReports() {
           profile:profiles!student_id(full_name, email),
           assignment:video_assignments!assignment_id(title, topic, group:groups(name))
         `)
-        .in(
-          'assignment_id',
-          (await supabase.from('video_assignments').select('id').eq('teacher_id', profile.id)).data?.map((a: any) => a.id) ?? []
-        )
+        .in('assignment_id', assignmentIds)
         .order('started_at', { ascending: false })
 
       const mapped: ReportRow[] = (sessions ?? []).map((s: any) => ({
@@ -58,23 +70,17 @@ export default function TeacherReports() {
       }))
       setRows(mapped)
       setFiltered(mapped)
-
-      const { data: asgns } = await supabase
-        .from('video_assignments')
-        .select('id, title')
-        .eq('teacher_id', profile.id)
-        .order('created_at', { ascending: false })
-      setAssignments(asgns ?? [])
       setLoading(false)
     }
     load()
-  }, [profile])
+  }, [profile?.id])
 
   useEffect(() => {
     if (selectedAssignment === 'all') {
       setFiltered(rows)
     } else {
-      setFiltered(rows.filter(r => r.assignment_title === assignments.find(a => a.id === selectedAssignment)?.title))
+      const title = assignments.find(a => a.id === selectedAssignment)?.title
+      setFiltered(rows.filter(r => r.assignment_title === title))
     }
   }, [selectedAssignment, rows, assignments])
 
@@ -88,7 +94,6 @@ export default function TeacherReports() {
     return `${m}m ${s % 60}s`
   }
 
-  // Chart data: score distribution
   const scoreDistribution = [
     { range: '0-20', count: filtered.filter(r => r.score <= 20).length },
     { range: '21-40', count: filtered.filter(r => r.score > 20 && r.score <= 40).length },
@@ -139,7 +144,6 @@ export default function TeacherReports() {
         </button>
       </div>
 
-      {/* Filters */}
       <div className="flex items-center gap-3 mb-6">
         <Filter className="w-4 h-4 text-ink-400" />
         <select
@@ -153,7 +157,6 @@ export default function TeacherReports() {
         <span className="text-sm text-ink-400 font-body">{filtered.length} registros</span>
       </div>
 
-      {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
           { label: 'Promedio general', value: `${avgScore}/100`, icon: TrendingUp, color: 'bg-gold-400/20 text-gold-600' },
@@ -171,7 +174,6 @@ export default function TeacherReports() {
         ))}
       </div>
 
-      {/* Chart */}
       {filtered.length > 0 && (
         <div className="bg-parchment-50 rounded-sm shadow-manuscript border border-parchment-200 p-6 mb-6">
           <h2 className="font-display text-lg font-semibold text-ink-800 mb-4">Distribución de calificaciones</h2>
@@ -190,7 +192,6 @@ export default function TeacherReports() {
         </div>
       )}
 
-      {/* Table */}
       <div className="bg-parchment-50 rounded-sm shadow-manuscript border border-parchment-200 overflow-hidden">
         <div className="px-5 py-4 border-b border-parchment-200">
           <h2 className="font-display text-lg font-semibold text-ink-800">Detalle por estudiante</h2>

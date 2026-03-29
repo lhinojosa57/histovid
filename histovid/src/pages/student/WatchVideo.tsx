@@ -13,7 +13,6 @@ export default function WatchVideo() {
   const navigate = useNavigate()
 
   const playerRef = useRef<ReactPlayer>(null)
-  const startTimeRef = useRef<number>(Date.now())
   const lastUpdateRef = useRef<number>(Date.now())
   const durationAccRef = useRef<number>(0)
 
@@ -29,13 +28,12 @@ export default function WatchVideo() {
   const [submitting, setSubmitting] = useState(false)
   const [answerResult, setAnswerResult] = useState<{ correct: boolean; points: number } | null>(null)
   const [playing, setPlaying] = useState(false)
-  const [videoProgress, setVideoProgress] = useState(0)
   const [loading, setLoading] = useState(true)
   const [completed, setCompleted] = useState(false)
 
-  // ── Load data ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!profile || !assignmentId) return
+    if (!profile?.id || !assignmentId) return
+
     async function load() {
       const [asgRes, qRes] = await Promise.all([
         supabase.from('video_assignments').select('*, group:groups(name)').eq('id', assignmentId).single(),
@@ -45,18 +43,17 @@ export default function WatchVideo() {
       setAssignment(asgRes.data)
       setQuestions(qRes.data ?? [])
 
-      // Get or create session
       let { data: sess } = await supabase
         .from('student_sessions')
         .select('*')
         .eq('assignment_id', assignmentId)
-        .eq('student_id', profile.id)
+        .eq('student_id', profile!.id)
         .single()
 
       if (!sess) {
         const { data: newSess } = await supabase
           .from('student_sessions')
-          .insert({ assignment_id: assignmentId, student_id: profile.id })
+          .insert({ assignment_id: assignmentId, student_id: profile!.id })
           .select()
           .single()
         sess = newSess
@@ -69,7 +66,6 @@ export default function WatchVideo() {
         return
       }
 
-      // Load existing answers
       if (sess?.id) {
         const { data: existingAnswers } = await supabase
           .from('student_answers')
@@ -85,22 +81,20 @@ export default function WatchVideo() {
         setAnsweredQuestions(answeredSet)
       }
 
-      // Seek to last position
       if (sess?.max_video_position && sess.max_video_position > 0) {
         setTimeout(() => {
           playerRef.current?.seekTo(sess.max_video_position, 'seconds')
         }, 1500)
       }
 
-      startTimeRef.current = Date.now()
+      lastUpdateRef.current = Date.now()
       durationAccRef.current = sess?.duration_seconds ?? 0
       setLoading(false)
       setPlaying(true)
     }
     load()
-  }, [profile, assignmentId])
+  }, [profile?.id, assignmentId])
 
-  // ── Track duration periodically ───────────────────────────────────────────
   useEffect(() => {
     if (!session || completed) return
     const interval = setInterval(async () => {
@@ -113,16 +107,10 @@ export default function WatchVideo() {
     return () => clearInterval(interval)
   }, [session, completed])
 
-  // ── Video progress handler ─────────────────────────────────────────────────
   const handleProgress = useCallback(({ playedSeconds }: { playedSeconds: number }) => {
-    setVideoProgress(playedSeconds)
-
-    // Update max position
     if (session && playedSeconds > (session.max_video_position ?? 0)) {
       supabase.from('student_sessions').update({ max_video_position: playedSeconds }).eq('id', session.id)
     }
-
-    // Check if we hit a question timestamp
     for (const q of questions) {
       if (answeredQuestions.has(q.id)) continue
       const diff = Math.abs(playedSeconds - q.timestamp_seconds)
@@ -137,9 +125,8 @@ export default function WatchVideo() {
     }
   }, [questions, answeredQuestions, session])
 
-  // ── Submit answer ──────────────────────────────────────────────────────────
   const submitAnswer = async () => {
-    if (!activeQuestion || !session || !profile || !currentAnswer.trim()) return
+    if (!activeQuestion || !session || !profile?.id || !currentAnswer.trim()) return
     setSubmitting(true)
 
     let isCorrect: boolean | null = null
@@ -152,7 +139,6 @@ export default function WatchVideo() {
       isCorrect = currentAnswer === activeQuestion.correct_answer
       pointsEarned = isCorrect ? activeQuestion.points : 0
     } else {
-      // Open question — always give partial credit for answering
       isCorrect = null
       pointsEarned = Math.floor(activeQuestion.points * 0.5)
     }
@@ -160,7 +146,7 @@ export default function WatchVideo() {
     await supabase.from('student_answers').upsert({
       session_id: session.id,
       question_id: activeQuestion.id,
-      student_id: profile.id,
+      student_id: profile!.id,
       answer_text: currentAnswer,
       is_correct: isCorrect,
       points_earned: pointsEarned,
@@ -179,14 +165,12 @@ export default function WatchVideo() {
     setPlaying(true)
   }
 
-  // ── Video ended ────────────────────────────────────────────────────────────
   const handleVideoEnd = async () => {
-    if (!session || !profile) return
+    if (!session || !profile?.id) return
     setPlaying(false)
 
     const unanswered = questions.filter(q => !answeredQuestions.has(q.id))
     if (unanswered.length > 0) {
-      // Still has unanswered questions from before the end
       setActiveQuestion(unanswered[0])
       setState('paused_question')
       return
@@ -204,7 +188,6 @@ export default function WatchVideo() {
     setCompleted(true)
   }
 
-  // ── Completion screen ──────────────────────────────────────────────────────
   if (completed) {
     return (
       <div className="min-h-screen bg-sepia-100 flex items-center justify-center p-4">
@@ -244,7 +227,6 @@ export default function WatchVideo() {
 
   return (
     <div className="min-h-screen bg-ink-900 flex flex-col">
-      {/* Top bar */}
       <div className="flex items-center gap-4 px-5 py-3 border-b border-ink-700">
         <button onClick={() => navigate('/student')} className="text-ink-400 hover:text-parchment-200 transition-colors">
           <ArrowLeft className="w-5 h-5" />
@@ -253,7 +235,6 @@ export default function WatchVideo() {
           <p className="font-display text-parchment-100 font-semibold truncate">{assignment?.title}</p>
           <p className="text-ink-400 text-xs font-body truncate">{assignment?.topic} · {(assignment as any)?.group?.name}</p>
         </div>
-        {/* Progress */}
         <div className="flex items-center gap-2 text-xs font-mono text-ink-400">
           <span className="text-gold-400">{answeredQuestions.size}</span>
           <span>/</span>
@@ -262,9 +243,7 @@ export default function WatchVideo() {
         </div>
       </div>
 
-      {/* Main area */}
       <div className="flex-1 flex flex-col lg:flex-row gap-0">
-        {/* Video */}
         <div className="flex-1 bg-black flex items-center justify-center relative min-h-0">
           <div className="w-full aspect-video max-h-[calc(100vh-120px)]">
             <ReactPlayer
@@ -283,7 +262,6 @@ export default function WatchVideo() {
             />
           </div>
 
-          {/* Overlay when paused for question */}
           {state === 'paused_question' && (
             <div className="absolute inset-0 bg-ink-900/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="w-full max-w-lg animate-slide-up">
@@ -301,7 +279,6 @@ export default function WatchVideo() {
           )}
         </div>
 
-        {/* Sidebar: assignment info */}
         <div className="lg:w-72 bg-ink-800 border-t lg:border-t-0 lg:border-l border-ink-700 overflow-y-auto">
           <div className="p-4 border-b border-ink-700">
             <h3 className="font-display text-parchment-100 font-semibold text-sm mb-1">Datos de la actividad</h3>
@@ -319,8 +296,6 @@ export default function WatchVideo() {
                 <p className="text-sm font-body text-parchment-300 leading-relaxed">{assignment.nem_process}</p>
               </div>
             )}
-
-            {/* Questions list */}
             {questions.length > 0 && (
               <div>
                 <p className="text-xs font-mono uppercase text-ink-400 tracking-wider mb-2">Preguntas</p>
@@ -329,10 +304,8 @@ export default function WatchVideo() {
                     const answered = answeredQuestions.has(q.id)
                     return (
                       <div key={q.id} className={`flex items-center gap-2.5 py-1.5 px-2 rounded text-xs ${answered ? 'text-green-400' : 'text-ink-400'}`}>
-                        <span className="w-4 h-4 flex-shrink-0">
-                          {answered ? '✓' : `${i + 1}.`}
-                        </span>
-                        <span className="font-mono">{Math.floor(q.timestamp_seconds / 60)}:{String(q.timestamp_seconds % 60).padStart(2, '0')}</span>
+                        <span className="w-4 h-4 flex-shrink-0">{answered ? '✓' : `${i + 1}.`}</span>
+                        <span className="font-mono">{Math.floor(q.timestamp_seconds / 60)}:{String(Math.floor(q.timestamp_seconds % 60)).padStart(2, '0')}</span>
                         <span className="truncate font-body">{q.question_text.substring(0, 35)}…</span>
                       </div>
                     )
@@ -346,8 +319,6 @@ export default function WatchVideo() {
     </div>
   )
 }
-
-// ── Question Overlay Component ─────────────────────────────────────────────
 
 function QuestionOverlay({ question, currentAnswer, onAnswer, onSubmit, submitting, result, onContinue }: {
   question: Question
@@ -366,7 +337,6 @@ function QuestionOverlay({ question, currentAnswer, onAnswer, onSubmit, submitti
 
   return (
     <div className="bg-parchment-50 rounded-sm shadow-raised border border-parchment-200 overflow-hidden">
-      {/* Header */}
       <div className="bg-crimson-500 px-5 py-3 flex items-center justify-between">
         <span className="text-parchment-100 text-xs font-mono uppercase tracking-wider">⏸ {typeLabel}</span>
         <span className="text-parchment-200 text-xs font-mono">{question.points} pts</span>
@@ -375,14 +345,10 @@ function QuestionOverlay({ question, currentAnswer, onAnswer, onSubmit, submitti
       <div className="p-5">
         <p className="font-display text-lg font-semibold text-ink-800 mb-5 leading-snug">{question.question_text}</p>
 
-        {/* Result state */}
         {result !== null ? (
           <div className={`rounded p-4 mb-4 border ${result.correct ? 'bg-green-700/10 border-green-700/20' : 'bg-crimson-500/10 border-crimson-500/20'}`}>
             <p className={`font-body font-semibold mb-1 ${result.correct ? 'text-green-700' : 'text-crimson-500'}`}>
-              {question.question_type === 'open'
-                ? '✓ Respuesta registrada'
-                : result.correct ? '✓ ¡Correcto!' : '✗ Incorrecto'
-              }
+              {question.question_type === 'open' ? '✓ Respuesta registrada' : result.correct ? '✓ ¡Correcto!' : '✗ Incorrecto'}
             </p>
             <p className="text-sm text-ink-600 font-body">
               {question.question_type === 'open'
@@ -397,7 +363,6 @@ function QuestionOverlay({ question, currentAnswer, onAnswer, onSubmit, submitti
           </div>
         ) : (
           <>
-            {/* Multiple choice */}
             {question.question_type === 'multiple_choice' && question.options && (
               <div className="space-y-2 mb-4">
                 {question.options.filter(o => o.text.trim()).map(opt => (
@@ -411,22 +376,16 @@ function QuestionOverlay({ question, currentAnswer, onAnswer, onSubmit, submitti
               </div>
             )}
 
-            {/* True/False */}
             {question.question_type === 'true_false' && (
               <div className="flex gap-3 mb-4">
                 {[{ val: 'true', label: '✓ Verdadero' }, { val: 'false', label: '✗ Falso' }].map(({ val, label }) => (
-                  <button
-                    key={val}
-                    onClick={() => onAnswer(val)}
-                    className={`flex-1 py-3 rounded border font-body font-medium transition-all ${currentAnswer === val ? 'border-gold-400 bg-gold-400/10 text-ink-800' : 'border-parchment-300 bg-white text-ink-600 hover:border-gold-300'}`}
-                  >
+                  <button key={val} onClick={() => onAnswer(val)} className={`flex-1 py-3 rounded border font-body font-medium transition-all ${currentAnswer === val ? 'border-gold-400 bg-gold-400/10 text-ink-800' : 'border-parchment-300 bg-white text-ink-600 hover:border-gold-300'}`}>
                     {label}
                   </button>
                 ))}
               </div>
             )}
 
-            {/* Open */}
             {question.question_type === 'open' && (
               <textarea
                 value={currentAnswer}
@@ -439,17 +398,12 @@ function QuestionOverlay({ question, currentAnswer, onAnswer, onSubmit, submitti
           </>
         )}
 
-        {/* Action button */}
         {result !== null ? (
-          <button onClick={onContinue} className="w-full flex items-center justify-center gap-2 bg-crimson-500 text-parchment-50 py-3 rounded-sm font-body font-medium hover:bg-crimson-600 transition-colors animate-pulse-gold">
+          <button onClick={onContinue} className="w-full flex items-center justify-center gap-2 bg-crimson-500 text-parchment-50 py-3 rounded-sm font-body font-medium hover:bg-crimson-600 transition-colors">
             Continuar video <ChevronRight className="w-4 h-4" />
           </button>
         ) : (
-          <button
-            onClick={onSubmit}
-            disabled={!currentAnswer.trim() || submitting}
-            className="w-full flex items-center justify-center gap-2 bg-ink-800 text-parchment-100 py-3 rounded-sm font-body font-medium hover:bg-ink-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
+          <button onClick={onSubmit} disabled={!currentAnswer.trim() || submitting} className="w-full flex items-center justify-center gap-2 bg-ink-800 text-parchment-100 py-3 rounded-sm font-body font-medium hover:bg-ink-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
             <Send className="w-4 h-4" />
             {submitting ? 'Enviando…' : 'Responder'}
           </button>

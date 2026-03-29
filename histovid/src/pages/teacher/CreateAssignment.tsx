@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import { supabase, Question, QuestionType, QuestionOption } from '@/lib/supabase'
@@ -68,27 +68,40 @@ export default function CreateAssignment() {
   const [questions, setQuestions] = useState<QuestionForm[]>([newQuestion(0)])
 
   useEffect(() => {
-    if (!profile) return
-    supabase.from('groups').select('id, name').eq('teacher_id', profile.id).then(({ data }) => setGroups(data ?? []))
+    if (!profile?.id) return
+    supabase.from('groups').select('id, name').eq('teacher_id', profile!.id).then(({ data }) => setGroups(data ?? []))
     if (isEdit) {
       supabase.from('video_assignments').select('*').eq('id', editId).single().then(({ data }) => {
-        if (data) setForm({ group_id: data.group_id, title: data.title, topic: data.topic, objective: data.objective ?? '', nem_process: data.nem_process ?? '', video_url: data.video_url, due_date: data.due_date ? data.due_date.substring(0, 16) : '', is_published: data.is_published })
+        if (data) setForm({
+          group_id: data.group_id,
+          title: data.title,
+          topic: data.topic,
+          objective: data.objective ?? '',
+          nem_process: data.nem_process ?? '',
+          video_url: data.video_url,
+          due_date: data.due_date ? data.due_date.substring(0, 16) : '',
+          is_published: data.is_published,
+        })
       })
       supabase.from('questions').select('*').eq('assignment_id', editId).order('order_index').then(({ data }) => {
         if (data && data.length > 0) {
-          setQuestions(data.map((q: Question) => ({ ...q, options: q.options ?? [{ id: 'a', text: '' }, { id: 'b', text: '' }] })))
+          setQuestions(data.map((q: Question) => ({
+            ...q,
+            correct_answer: q.correct_answer ?? '',
+            options: q.options ?? [{ id: 'a', text: '' }, { id: 'b', text: '' }],
+          })))
         }
       })
     }
-  }, [profile, isEdit, editId])
+  }, [profile?.id, isEdit, editId])
 
   const handleSave = async (publish = false) => {
-    if (!profile || !form.group_id || !form.title || !form.video_url) {
+    if (!profile?.id || !form.group_id || !form.title || !form.video_url) {
       alert('Completa: grupo, título y URL del video')
       return
     }
     setSaving(true)
-    const payload = { ...form, teacher_id: profile.id, is_published: publish || form.is_published, due_date: form.due_date || null }
+    const payload = { ...form, teacher_id: profile!.id, is_published: publish || form.is_published, due_date: form.due_date || null }
     let assignmentId = editId
 
     if (isEdit) {
@@ -143,7 +156,6 @@ export default function CreateAssignment() {
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
-      {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <button onClick={() => navigate('/teacher/assignments')} className="text-ink-400 hover:text-ink-700 p-1.5 rounded hover:bg-sepia-100 transition-colors">
           <ArrowLeft className="w-5 h-5" />
@@ -155,7 +167,6 @@ export default function CreateAssignment() {
       </div>
 
       <div className="space-y-6">
-        {/* Section 1: Basic info */}
         <div className="bg-parchment-50 rounded-sm shadow-manuscript border border-parchment-200 p-6">
           <h2 className="font-display text-lg font-semibold text-ink-800 mb-4 flex items-center gap-2">
             <span className="w-6 h-6 bg-crimson-500 text-parchment-50 rounded text-xs flex items-center justify-center font-mono font-bold">1</span>
@@ -175,22 +186,18 @@ export default function CreateAssignment() {
                 <input type="datetime-local" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} className="input-style w-full" />
               </div>
             </div>
-
             <div>
               <label className="label-style">Título de la actividad *</label>
               <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="ej. La Revolución Mexicana – Causas y antecedentes" className="input-style w-full" />
             </div>
-
             <div>
               <label className="label-style">Tema del día *</label>
               <input value={form.topic} onChange={e => setForm(f => ({ ...f, topic: e.target.value }))} placeholder="ej. Causas de la Revolución Mexicana" className="input-style w-full" />
             </div>
-
             <div>
               <label className="label-style">Objetivo de aprendizaje</label>
               <textarea value={form.objective} onChange={e => setForm(f => ({ ...f, objective: e.target.value }))} rows={2} placeholder="Al finalizar, el estudiante será capaz de…" className="input-style w-full resize-none" />
             </div>
-
             <div>
               <label className="label-style flex items-center gap-2">
                 Proceso de desarrollo de aprendizaje (NEM)
@@ -201,7 +208,6 @@ export default function CreateAssignment() {
           </div>
         </div>
 
-        {/* Section 2: Video */}
         <div className="bg-parchment-50 rounded-sm shadow-manuscript border border-parchment-200 p-6">
           <h2 className="font-display text-lg font-semibold text-ink-800 mb-4 flex items-center gap-2">
             <span className="w-6 h-6 bg-crimson-500 text-parchment-50 rounded text-xs flex items-center justify-center font-mono font-bold">2</span>
@@ -214,7 +220,6 @@ export default function CreateAssignment() {
           </div>
         </div>
 
-        {/* Section 3: Questions */}
         <div className="bg-parchment-50 rounded-sm shadow-manuscript border border-parchment-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-display text-lg font-semibold text-ink-800 flex items-center gap-2">
@@ -250,7 +255,6 @@ export default function CreateAssignment() {
           )}
         </div>
 
-        {/* Actions */}
         <div className="flex items-center justify-end gap-3 pb-8">
           <button onClick={() => navigate('/teacher/assignments')} className="px-5 py-2.5 border border-parchment-300 text-ink-700 rounded-sm font-body hover:bg-sepia-100 transition-colors">
             Cancelar
@@ -266,7 +270,6 @@ export default function CreateAssignment() {
         </div>
       </div>
 
-      {/* Inline styles for inputs */}
       <style>{`
         .label-style { display: block; font-size: 0.875rem; font-weight: 500; color: #3d2c14; margin-bottom: 0.375rem; font-family: 'Source Serif 4', serif; }
         .input-style { border: 1px solid #e8d3a9; border-radius: 0.25rem; padding: 0.5rem 0.75rem; font-family: 'Source Serif 4', serif; color: #2d1f0e; background: white; transition: border-color 0.15s; }
@@ -276,8 +279,6 @@ export default function CreateAssignment() {
     </div>
   )
 }
-
-// ─── Question Editor Sub-component ───────────────────────────────────────────
 
 function QuestionEditor({ q, idx, isExpanded, onToggle, onUpdate, onUpdateOption, onRemove }: {
   q: QuestionForm; idx: number; isExpanded: boolean
@@ -292,7 +293,6 @@ function QuestionEditor({ q, idx, isExpanded, onToggle, onUpdate, onUpdateOption
 
   return (
     <div className="border border-parchment-300 rounded bg-white overflow-hidden">
-      {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-sepia-100/50" onClick={onToggle}>
         <GripVertical className="w-4 h-4 text-ink-300 flex-shrink-0" />
         <span className="font-mono text-xs text-ink-400 flex-shrink-0">#{idx + 1}</span>
@@ -314,7 +314,6 @@ function QuestionEditor({ q, idx, isExpanded, onToggle, onUpdate, onUpdateOption
         {isExpanded ? <ChevronUp className="w-4 h-4 text-ink-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-ink-400 flex-shrink-0" />}
       </div>
 
-      {/* Body */}
       {isExpanded && (
         <div className="px-4 pb-4 pt-1 border-t border-parchment-200 space-y-4">
           <div className="grid grid-cols-3 gap-3">
@@ -347,32 +346,19 @@ function QuestionEditor({ q, idx, isExpanded, onToggle, onUpdate, onUpdateOption
             <textarea value={q.question_text} onChange={e => onUpdate({ question_text: e.target.value })} rows={2} className="input-style w-full resize-none" placeholder="Escribe la pregunta…" />
           </div>
 
-          {/* Multiple choice options */}
           {q.question_type === 'multiple_choice' && (
             <div className="space-y-2">
               <label className="label-style">Opciones (marca la correcta)</label>
               {q.options.map(opt => (
                 <div key={opt.id} className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name={`correct-${idx}`}
-                    checked={q.correct_answer === opt.id}
-                    onChange={() => onUpdate({ correct_answer: opt.id })}
-                    className="w-4 h-4 accent-gold-500 flex-shrink-0"
-                  />
+                  <input type="radio" name={`correct-${idx}`} checked={q.correct_answer === opt.id} onChange={() => onUpdate({ correct_answer: opt.id })} className="w-4 h-4 accent-gold-500 flex-shrink-0" />
                   <span className="font-mono text-xs text-ink-400 w-4">{opt.id.toUpperCase()})</span>
-                  <input
-                    value={opt.text}
-                    onChange={e => onUpdateOption(opt.id, e.target.value)}
-                    placeholder={`Opción ${opt.id.toUpperCase()}`}
-                    className="input-style flex-1 text-sm"
-                  />
+                  <input value={opt.text} onChange={e => onUpdateOption(opt.id, e.target.value)} placeholder={`Opción ${opt.id.toUpperCase()}`} className="input-style flex-1 text-sm" />
                 </div>
               ))}
             </div>
           )}
 
-          {/* True/False */}
           {q.question_type === 'true_false' && (
             <div>
               <label className="label-style">Respuesta correcta</label>
@@ -387,7 +373,6 @@ function QuestionEditor({ q, idx, isExpanded, onToggle, onUpdate, onUpdateOption
             </div>
           )}
 
-          {/* Open */}
           {q.question_type === 'open' && (
             <div className="bg-sepia-100 rounded p-3 text-sm font-body text-ink-500 border border-parchment-200">
               💬 El estudiante escribirá su respuesta. No se califica automáticamente, pero se registra para revisión del docente.
