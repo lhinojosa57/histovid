@@ -257,7 +257,7 @@ export default function WatchVideo() {
               onEnded={handleVideoEnd}
               progressInterval={500}
               config={{
-                youtube: { playerVars: { disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, fs: 0, playsinline: 1 } },
+                youtube: { playerVars: { disablekb: 1, modestbranding: 1, rel: 0 } },
               }}
             />
           </div>
@@ -281,38 +281,13 @@ export default function WatchVideo() {
 
         <div className="lg:w-72 bg-ink-800 border-t lg:border-t-0 lg:border-l border-ink-700 overflow-y-auto">
           <div className="p-4 border-b border-ink-700">
-            <h3 className="font-display text-parchment-100 font-semibold text-sm mb-1">Datos de la actividad</h3>
+            <h3 className="font-display text-parchment-100 font-semibold text-sm">Datos de la actividad</h3>
           </div>
           <div className="p-4">
             <p className="text-xs font-mono uppercase text-ink-400 tracking-wider mb-2">Progreso</p>
-               <p className="text-parchment-300 font-body text-sm">
-                    {answeredQuestions.size} de {questions.length} preguntas respondidas
-                </p>
-              </div>
-            )}
-            {assignment?.nem_process && (
-              <div>
-                <p className="text-xs font-mono uppercase text-ink-400 tracking-wider mb-1">Proceso NEM</p>
-                <p className="text-sm font-body text-parchment-300 leading-relaxed">{assignment.nem_process}</p>
-              </div>
-            )}
-            {questions.length > 0 && (
-              <div>
-                <p className="text-xs font-mono uppercase text-ink-400 tracking-wider mb-2">Preguntas</p>
-                <div className="space-y-1.5">
-                  {questions.map((q, i) => {
-                    const answered = answeredQuestions.has(q.id)
-                    return (
-                      <div key={q.id} className={`flex items-center gap-2.5 py-1.5 px-2 rounded text-xs ${answered ? 'text-green-400' : 'text-ink-400'}`}>
-                        <span className="w-4 h-4 flex-shrink-0">{answered ? '✓' : `${i + 1}.`}</span>
-                        <span className="font-mono">{Math.floor(q.timestamp_seconds / 60)}:{String(Math.floor(q.timestamp_seconds % 60)).padStart(2, '0')}</span>
-                        <span className="truncate font-body">{q.question_text.substring(0, 35)}…</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+            <p className="text-parchment-300 font-body text-sm">
+              {answeredQuestions.size} de {questions.length} preguntas respondidas
+            </p>
           </div>
         </div>
       </div>
