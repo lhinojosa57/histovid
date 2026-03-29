@@ -69,8 +69,8 @@ export default function Layout() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded text-sm font-body transition-all ${
                   isActive
-                    ? 'bg-gold-500/20 text-gold-300 font-medium'
-                    : 'text-ink-400 hover:text-parchment-200 hover:bg-ink-800'
+                    ? 'bg-gold-500/20 text-gold-300 font-medium border-l-2 border-gold-400'
+                    :'text-parchment-300 hover:text-parchment-100 hover:bg-ink-800'
                 }`
               }
             >
