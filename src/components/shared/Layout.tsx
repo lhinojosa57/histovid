@@ -1,3 +1,4 @@
+import React from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import { LogOut, BookOpen, Users, Video, BarChart2, PlaySquare, Home } from 'lucide-react'
