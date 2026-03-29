@@ -283,11 +283,9 @@ export default function WatchVideo() {
           <div className="p-4 border-b border-ink-700">
             <h3 className="font-display text-parchment-100 font-semibold text-sm mb-1">Datos de la actividad</h3>
           </div>
-          <div className="p-4 space-y-4">
-            {questions.length > 0 && (
-              <div>
-                <p className="text-xs font-mono uppercase text-ink-400 tracking-wider mb-2">Progreso</p>
-                <p className="text-parchment-300 font-body text-sm">
+          <div className="p-4">
+            <p className="text-xs font-mono uppercase text-ink-400 tracking-wider mb-2">Progreso</p>
+               <p className="text-parchment-300 font-body text-sm">
                     {answeredQuestions.size} de {questions.length} preguntas respondidas
                 </p>
               </div>
