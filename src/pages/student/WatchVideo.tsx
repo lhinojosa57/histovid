@@ -248,7 +248,7 @@ export default function WatchVideo() {
           <div className="w-full aspect-video max-h-[calc(100vh-120px)]">
             <ReactPlayer
               ref={playerRef}
-              url={assignment?.video_url}
+              url={getVideoUrl(assignment?.video_url ?? '')}
               playing={playing}
               controls={false}
               width="100%"
@@ -281,6 +281,15 @@ export default function WatchVideo() {
       </div>
     </div>
   )
+}
+
+function getVideoUrl(url: string): string {
+  // Convert Google Drive share URL to embed URL
+  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/)
+  if (driveMatch) {
+    return `https://drive.google.com/file/d/${driveMatch[1]}/preview`
+  }
+  return url
 }
 
 function QuestionOverlay({ question, currentAnswer, onAnswer, onSubmit, submitting, result, onContinue }: {
