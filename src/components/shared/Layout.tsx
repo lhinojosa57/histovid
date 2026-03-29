@@ -84,7 +84,7 @@ export default function Layout() {
         <div className="p-3 border-t border-ink-700">
           <button
             onClick={handleSignOut}
-            className="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-body text-ink-400 hover:text-crimson-400 hover:bg-ink-800 w-full transition-all"
+            className="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-body text-parchment-300 hover:text-crimson-400 hover:bg-ink-800 w-full transition-all"
           >
             <LogOut className="w-4 h-4" />
             Cerrar sesión
