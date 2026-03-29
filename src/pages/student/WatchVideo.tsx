@@ -30,6 +30,32 @@ export default function WatchVideo() {
   const [playing, setPlaying] = useState(false)
   const [loading, setLoading] = useState(true)
   const [completed, setCompleted] = useState(false)
+// Timer para videos de Drive
+const driveTimerRef = useRef<number>(0)
+const driveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+const isDrive = assignment?.video_url?.includes('drive.google.com') ?? false
+
+useEffect(() => {
+  if (!isDrive || !playing || completed) return
+  driveIntervalRef.current = setInterval(() => {
+    driveTimerRef.current += 0.5
+    // Check questions
+    for (const q of questions) {
+      if (answeredQuestions.has(q.id)) continue
+      if (Math.abs(driveTimerRef.current - q.timestamp_seconds) < 0.6) {
+        setPlaying(false)
+        setActiveQuestion(q)
+        setState('paused_question')
+        setCurrentAnswer('')
+        setAnswerResult(null)
+        break
+      }
+    }
+  }, 500)
+  return () => {
+    if (driveIntervalRef.current) clearInterval(driveIntervalRef.current)
+  }
+}, [isDrive, playing, questions, answeredQuestions, completed])
 
   useEffect(() => {
     if (!profile?.id || !assignmentId) return
