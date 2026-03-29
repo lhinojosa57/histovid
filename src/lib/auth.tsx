@@ -57,7 +57,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
-        skipBrowserRedirect: false,
         queryParams: {
           hd: 'nikolatesla.edu.mx',  // Allow any Google Workspace domain
           prompt: 'select_account',
