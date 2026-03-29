@@ -6,32 +6,17 @@ export default function AuthCallback() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    // Supabase needs a moment to exchange the hash fragment for a session
-    const handleCallback = async () => {
-      // Give Supabase time to process the hash fragment (#access_token=...)
-      const { data, error } = await supabase.auth.getSession()
-
+    supabase.auth.exchangeCodeForSession(
+      new URLSearchParams(window.location.search).get('code') ?? ''
+    ).then(async ({ data, error }) => {
       if (error || !data.session) {
-        // If no session yet, wait a bit and try again
-        setTimeout(async () => {
-          const { data: retryData } = await supabase.auth.getSession()
-          if (retryData.session) {
-            await redirectByRole(retryData.session.user.id)
-          } else {
-            navigate('/login', { replace: true })
-          }
-        }, 1500)
+        navigate('/login', { replace: true })
         return
       }
-
-      await redirectByRole(data.session.user.id)
-    }
-
-    const redirectByRole = async (userId: string) => {
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
-        .eq('id', userId)
+        .eq('id', data.session.user.id)
         .single()
 
       if (profile?.role) {
@@ -39,9 +24,7 @@ export default function AuthCallback() {
       } else {
         navigate('/setup-role', { replace: true })
       }
-    }
-
-    handleCallback()
+    })
   }, [navigate])
 
   return (
