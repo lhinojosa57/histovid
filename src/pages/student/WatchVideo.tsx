@@ -257,7 +257,7 @@ export default function WatchVideo() {
               onEnded={handleVideoEnd}
               progressInterval={500}
               config={{
-                youtube: { playerVars: { disablekb: 1, modestbranding: 1, rel: 0 } },
+                youtube: { playerVars: { disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, fs: 0, playsinline: 1 } },
               }}
             />
           </div>
@@ -284,10 +284,12 @@ export default function WatchVideo() {
             <h3 className="font-display text-parchment-100 font-semibold text-sm mb-1">Datos de la actividad</h3>
           </div>
           <div className="p-4 space-y-4">
-            {assignment?.objective && (
+            {questions.length > 0 && (
               <div>
-                <p className="text-xs font-mono uppercase text-ink-400 tracking-wider mb-1">Objetivo</p>
-                <p className="text-sm font-body text-parchment-300 leading-relaxed">{assignment.objective}</p>
+                <p className="text-xs font-mono uppercase text-ink-400 tracking-wider mb-2">Progreso</p>
+                <p className="text-parchment-300 font-body text-sm">
+                    {answeredQuestions.size} de {questions.length} preguntas respondidas
+                </p>
               </div>
             )}
             {assignment?.nem_process && (
