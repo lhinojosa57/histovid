@@ -246,21 +246,32 @@ export default function WatchVideo() {
       <div className="flex-1 flex flex-col lg:flex-row gap-0">
         <div className="flex-1 bg-black flex items-center justify-center relative min-h-0">
           <div className="w-full aspect-video max-h-[calc(100vh-120px)]">
-            <ReactPlayer
-              ref={playerRef}
-              url={getVideoUrl(assignment?.video_url ?? '')}
-              playing={playing}
-              controls={false}
-              width="100%"
-              height="100%"
-              onProgress={handleProgress}
-              onEnded={handleVideoEnd}
-              progressInterval={500}
-              config={{
-                youtube: { playerVars: { disablekb: 1, modestbranding: 1, rel: 0, controls: 0 } },
-              }}
-            />
-          </div>
+  {assignment?.video_url?.includes('drive.google.com') ? (
+    <iframe
+      src={getVideoUrl(assignment.video_url)}
+      width="100%"
+      height="100%"
+      allow="autoplay"
+      allowFullScreen={false}
+      style={{ border: 'none' }}
+    />
+  ) : (
+    <ReactPlayer
+      ref={playerRef}
+      url={assignment?.video_url}
+      playing={playing}
+      controls={false}
+      width="100%"
+      height="100%"
+      onProgress={handleProgress}
+      onEnded={handleVideoEnd}
+      progressInterval={500}
+      config={{
+        youtube: { playerVars: { disablekb: 1, modestbranding: 1, rel: 0, controls: 0 } },
+      }}
+    />
+  )}
+</div>
 
           {state === 'paused_question' && (
             <div className="absolute inset-0 bg-ink-900/80 backdrop-blur-sm flex items-center justify-center p-4">
