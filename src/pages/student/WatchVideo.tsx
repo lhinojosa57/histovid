@@ -30,15 +30,20 @@ export default function WatchVideo() {
   const [playing, setPlaying] = useState(false)
   const [loading, setLoading] = useState(true)
   const [completed, setCompleted] = useState(false)
+  const [driveReady, setDriveReady] = useState(false)
 // Timer para videos de Drive
 const driveTimerRef = useRef<number>(0)
 const driveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 const isDrive = assignment?.video_url?.includes('drive.google.com') ?? false
 
 useEffect(() => {
-  if (!isDrive || !playing || completed) return
+  if (!isDrive || !driveReady || completed) return
   driveIntervalRef.current = setInterval(() => {
-    driveTimerRef.current += 0.5
+    if (driveTimerRef.current === 0) {
+  // Skip first 3 seconds to let Drive iframe load
+  driveTimerRef.current = -3
+}
+driveTimerRef.current += 0.5
     // Check questions
     for (const q of questions) {
       if (answeredQuestions.has(q.id)) continue
@@ -270,12 +275,13 @@ useEffect(() => {
             Terminar actividad
           </button>
         )}
-        
+
       </div>
       <div className="flex-1 flex flex-col lg:flex-row gap-0">
         <div className="flex-1 bg-black flex items-center justify-center relative min-h-0">
           <div className="w-full aspect-video max-h-[calc(100vh-120px)]">
   {assignment?.video_url?.includes('drive.google.com') ? (
+  <div className="relative w-full h-full">
     <iframe
       src={getVideoUrl(assignment.video_url)}
       width="100%"
@@ -284,6 +290,20 @@ useEffect(() => {
       allowFullScreen={false}
       style={{ border: 'none' }}
     />
+    {!driveReady && (
+      <div className="absolute inset-0 bg-ink-900 flex items-center justify-center">
+        <button
+          onClick={() => {
+            setDriveReady(true)
+            driveTimerRef.current = 0
+          }}
+          className="flex items-center gap-3 bg-crimson-500 text-parchment-50 px-8 py-4 rounded-sm font-display text-xl font-semibold hover:bg-crimson-600 transition-colors shadow-raised"
+        >
+          ▶ Iniciar video
+        </button>
+      </div>
+    )}
+  </div>
   ) : (
     <ReactPlayer
       ref={playerRef}
