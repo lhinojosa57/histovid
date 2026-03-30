@@ -336,21 +336,15 @@ useEffect(() => {
     )}
   </div>
   ) : (
-    <ReactPlayer
-      ref={playerRef}
-      url={assignment?.video_url}
-      playing={playing}
-      controls={true}
-      width="100%"
-      height="100%"
-      onProgress={handleProgress}
-      onEnded={handleVideoEnd}
-      progressInterval={500}
-      config={{
-        youtube: { playerVars: { disablekb: 1, modestbranding: 1, rel: 0, controls: 0 } },
-      }}
-    />
-  )}
+   <iframe
+    src={getVideoUrl(assignment?.video_url ?? '')}
+    width="100%"
+    height="100%"
+    allow="autoplay; encrypted-media"
+    allowFullScreen={false}
+    style={{ border: 'none' }}
+  />
+)}
 </div>
 
           {state === 'paused_question' && (
@@ -379,6 +373,11 @@ function getVideoUrl(url: string): string {
   const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/)
   if (driveMatch) {
     return `https://drive.google.com/file/d/${driveMatch[1]}/preview`
+  }
+  // Convert YouTube to YouTube Education for Google Workspace
+  const youtubeMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)
+  if (youtubeMatch) {
+    return `https://www.youtubeeducation.com/embed/${youtubeMatch[1]}`
   }
   return url
 }
