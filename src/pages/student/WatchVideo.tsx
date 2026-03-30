@@ -251,7 +251,7 @@ useEffect(() => {
     )
   }
 
-  return (
+ return (
     <div className="min-h-screen bg-ink-900 flex flex-col">
       <div className="flex items-center gap-4 px-5 py-3 border-b border-ink-700">
         <button onClick={() => navigate('/student')} className="text-ink-400 hover:text-parchment-200 transition-colors">
@@ -261,14 +261,17 @@ useEffect(() => {
           <p className="font-display text-parchment-100 font-semibold truncate">{assignment?.title}</p>
           <p className="text-ink-400 text-xs font-body truncate">{assignment?.topic} · {(assignment as any)?.group?.name}</p>
         </div>
-        <div className="flex items-center gap-2 text-xs font-mono text-ink-400">
-          <span className="text-gold-400">{answeredQuestions.size}</span>
-          <span>/</span>
-          <span>{questions.length}</span>
-          <span className="text-ink-500">preguntas</span>
-        </div>
+        {!completed && (
+          <button
+            onClick={handleVideoEnd}
+            className="flex items-center gap-2 bg-crimson-500 text-parchment-50 px-4 py-2 rounded-sm font-body text-sm font-medium hover:bg-crimson-600 transition-colors"
+          >
+            <CheckCircle className="w-4 h-4" />
+            Terminar actividad
+          </button>
+        )}
+        
       </div>
-
       <div className="flex-1 flex flex-col lg:flex-row gap-0">
         <div className="flex-1 bg-black flex items-center justify-center relative min-h-0">
           <div className="w-full aspect-video max-h-[calc(100vh-120px)]">
