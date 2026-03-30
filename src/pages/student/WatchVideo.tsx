@@ -37,18 +37,25 @@ const driveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 const isDrive = assignment?.video_url?.includes('drive.google.com') ?? false
 
 useEffect(() => {
-  if (!isDrive || !driveReady || completed) return
+  if (!isDrive || !driveReady || completed) {
+    if (driveIntervalRef.current) {
+      clearInterval(driveIntervalRef.current)
+      driveIntervalRef.current = null
+    }
+    return
+  }
+
+  driveTimerRef.current = 0
+
   driveIntervalRef.current = setInterval(() => {
-    if (driveTimerRef.current === 0) {
-  // Skip first 3 seconds to let Drive iframe load
-  driveTimerRef.current = -3
-}
-driveTimerRef.current += 0.5
-    // Check questions
+    driveTimerRef.current += 0.5
+
     for (const q of questions) {
       if (answeredQuestions.has(q.id)) continue
-      if (Math.abs(driveTimerRef.current - q.timestamp_seconds) < 0.6) {
-        setPlaying(false)
+      if (driveTimerRef.current >= q.timestamp_seconds && 
+          driveTimerRef.current < q.timestamp_seconds + 1) {
+        clearInterval(driveIntervalRef.current!)
+        driveIntervalRef.current = null
         setActiveQuestion(q)
         setState('paused_question')
         setCurrentAnswer('')
@@ -57,10 +64,14 @@ driveTimerRef.current += 0.5
       }
     }
   }, 500)
+
   return () => {
-    if (driveIntervalRef.current) clearInterval(driveIntervalRef.current)
+    if (driveIntervalRef.current) {
+      clearInterval(driveIntervalRef.current)
+      driveIntervalRef.current = null
+    }
   }
-}, [isDrive, playing, questions, answeredQuestions, completed])
+}, [isDrive, driveReady, completed, questions, answeredQuestions])
 
   useEffect(() => {
     if (!profile?.id || !assignmentId) return
@@ -189,12 +200,32 @@ driveTimerRef.current += 0.5
   }
 
   const continueVideo = () => {
-    setState('playing')
-    setActiveQuestion(null)
-    setAnswerResult(null)
-    setCurrentAnswer('')
-    setPlaying(true)
+  setState('playing')
+  setActiveQuestion(null)
+  setAnswerResult(null)
+  setCurrentAnswer('')
+  setPlaying(true)
+  
+  // Restart Drive timer from current position
+  if (isDrive && driveReady) {
+    driveIntervalRef.current = setInterval(() => {
+      driveTimerRef.current += 0.5
+      for (const q of questions) {
+        if (answeredQuestions.has(q.id)) continue
+        if (driveTimerRef.current >= q.timestamp_seconds &&
+            driveTimerRef.current < q.timestamp_seconds + 1) {
+          clearInterval(driveIntervalRef.current!)
+          driveIntervalRef.current = null
+          setActiveQuestion(q)
+          setState('paused_question')
+          setCurrentAnswer('')
+          setAnswerResult(null)
+          break
+        }
+      }
+    }, 500)
   }
+}
 
   const handleVideoEnd = async () => {
     if (!session || !profile?.id) return
