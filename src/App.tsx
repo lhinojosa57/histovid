@@ -2,7 +2,6 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import LoginPage from '@/pages/LoginPage'
 import AuthCallback from '@/pages/AuthCallback'
-import SetupRolePage from '@/pages/SetupRolePage'
 import TeacherDashboard from '@/pages/teacher/TeacherDashboard'
 import TeacherGroups from '@/pages/teacher/TeacherGroups'
 import TeacherAssignments from '@/pages/teacher/TeacherAssignments'
@@ -54,10 +53,7 @@ export default function App() {
         ) : <LoginPage />
       } />
       <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route path="/setup-role" element={
-        user ? <SetupRolePage /> : <Navigate to="/login" replace />
-      } />
-
+      
       {/* Teacher routes */}
       <Route path="/teacher" element={
         <ProtectedRoute role="teacher"><Layout /></ProtectedRoute>

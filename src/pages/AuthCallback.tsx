@@ -6,23 +6,45 @@ export default function AuthCallback() {
   const navigate = useNavigate()
 
   useEffect(() => {
-  supabase.auth.getSession().then(async ({ data, error }) => {
-    if (error || !data.session) {
-      setTimeout(async () => {
-        const { data: retry } = await supabase.auth.getSession()
-        if (retry.session) {
-          const { data: profile } = await supabase.from('profiles').select('role').eq('id', retry.session.user.id).single()
-          navigate(profile?.role === 'teacher' ? '/teacher' : profile?.role === 'student' ? '/student' : '/setup-role', { replace: true })
-        } else {
-          navigate('/login', { replace: true })
-        }
-      }, 2000)
-      return
+    async function handleCallback() {
+      const { data, error } = await supabase.auth.getSession()
+
+      if (error || !data.session) {
+        setTimeout(async () => {
+          const { data: retry } = await supabase.auth.getSession()
+          if (retry.session) {
+            await redirectUser(retry.session.user.email ?? '')
+          } else {
+            navigate('/login', { replace: true })
+          }
+        }, 2000)
+        return
+      }
+
+      await redirectUser(data.session.user.email ?? '')
     }
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.session.user.id).single()
-    navigate(profile?.role === 'teacher' ? '/teacher' : profile?.role === 'student' ? '/student' : '/setup-role', { replace: true })
-  })
-}, [navigate])
+
+    async function redirectUser(email: string) {
+      // Check if email is in teachers table
+      const { data: teacher } = await supabase
+        .from('teachers')
+        .select('email')
+        .eq('email', email)
+        .single()
+
+      if (teacher) {
+        // Update profile role to teacher
+        await supabase.from('profiles').update({ role: 'teacher' }).eq('email', email)
+        navigate('/teacher', { replace: true })
+      } else {
+        // Update profile role to student
+        await supabase.from('profiles').update({ role: 'student' }).eq('email', email)
+        navigate('/student', { replace: true })
+      }
+    }
+
+    handleCallback()
+  }, [navigate])
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-sepia-100">
