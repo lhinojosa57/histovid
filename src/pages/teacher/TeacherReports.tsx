@@ -17,103 +17,8 @@ interface ReportRow {
   duration_seconds: number
   score: number
   is_completed: boolean
+  session_id: string
 }
-
-{/* Modal de detalle por estudiante */}
-{selectedSession && (
-  <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div className="bg-parchment-50 rounded-sm shadow-raised w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-parchment-200 animate-slide-up">
-      <div className="flex items-center justify-between p-6 border-b border-parchment-200 sticky top-0 bg-parchment-50">
-        <div>
-          <h2 className="font-display text-xl font-semibold text-ink-800">{selectedSession.student_name}</h2>
-          <p className="text-sm text-ink-500 font-body">{selectedSession.assignment_title} · {selectedSession.topic}</p>
-        </div>
-        <button onClick={() => setSelectedSession(null)} className="text-ink-400 hover:text-ink-700 p-1 text-xl">✕</button>
-      </div>
-
-      <div className="p-6 space-y-4">
-        {loadingAnswers ? (
-          <div className="text-center py-8">
-            <div className="spinner mx-auto mb-3" />
-            <p className="text-ink-500 font-body text-sm">Cargando respuestas…</p>
-          </div>
-        ) : sessionAnswers.length === 0 ? (
-          <p className="text-ink-400 font-body text-center py-8">Sin respuestas registradas.</p>
-        ) : (
-          sessionAnswers.map((answer: any) => {
-            const q = answer.question
-            const isOpen = q?.question_type === 'open'
-            return (
-              <div key={answer.id} className="bg-white rounded border border-parchment-200 p-4">
-                <div className="flex items-start justify-between gap-4 mb-2">
-                  <p className="font-body font-medium text-ink-800 flex-1">{q?.question_text}</p>
-                  <span className="text-xs font-mono bg-sepia-100 text-ink-500 px-2 py-1 rounded flex-shrink-0">
-                    {Math.floor(q?.timestamp_seconds / 60)}:{String(Math.floor(q?.timestamp_seconds % 60)).padStart(2, '0')}
-                  </span>
-                </div>
-
-                <p className="text-sm font-body text-ink-600 mb-3">
-                  <span className="font-medium">Respuesta: </span>
-                  {answer.answer_text ?? <span className="text-ink-300 italic">Sin respuesta</span>}
-                </p>
-
-                {isOpen ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-ink-500 font-body">Calificación:</span>
-                    {[
-                      { label: 'Completa', value: 1 },
-                      { label: 'Parcial', value: 0.5 },
-                      { label: 'Incorrecta', value: 0 },
-                    ].map(opt => (
-                      <button
-                        key={opt.value}
-                        onClick={() => gradeOpenAnswer(answer.id, q.points, opt.value)}
-                        disabled={savingScore === answer.id}
-                        className={`text-xs px-3 py-1.5 rounded font-body font-medium transition-colors ${
-                          answer.points_earned === Math.round(q.points * opt.value)
-                            ? 'bg-crimson-500 text-parchment-50'
-                            : 'bg-sepia-100 text-ink-600 hover:bg-sepia-200'
-                        }`}
-                      >
-                        {savingScore === answer.id ? '…' : opt.label}
-                      </button>
-                    ))}
-                    <span className="text-xs font-mono text-ink-400 ml-1">
-                      {answer.points_earned}/{q.points} pts
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs font-mono px-2 py-1 rounded ${answer.is_correct ? 'bg-green-700/10 text-green-700' : 'bg-crimson-500/10 text-crimson-500'}`}>
-                      {answer.is_correct ? '✓ Correcta' : '✗ Incorrecta'}
-                    </span>
-                    <span className="text-xs font-mono text-ink-400">
-                      {answer.points_earned}/{q.points} pts
-                    </span>
-                  </div>
-                )}
-              </div>
-            )
-          })
-        )}
-      </div>
-
-      <div className="p-6 pt-0 border-t border-parchment-200 mt-4 flex justify-between items-center">
-        <div>
-          <span className="text-sm font-body text-ink-600">Calificación actual: </span>
-          <span className="font-display text-2xl font-bold text-ink-900">{selectedSession.score}</span>
-          <span className="font-mono text-ink-400">/100</span>
-        </div>
-        <button
-          onClick={() => setSelectedSession(null)}
-          className="bg-ink-800 text-parchment-100 px-5 py-2.5 rounded-sm font-body font-medium hover:bg-ink-900 transition-colors"
-        >
-          Cerrar
-        </button>
-      </div>
-    </div>
-  </div>
-)}
 
 export default function TeacherReports() {
   const { profile } = useAuth()
@@ -167,6 +72,7 @@ export default function TeacherReports() {
         duration_seconds: s.duration_seconds ?? 0,
         score: Math.round(s.score ?? 0),
         is_completed: s.is_completed,
+        session_id: s.id,
       }))
       setRows(mapped)
       setFiltered(mapped)
@@ -174,6 +80,7 @@ export default function TeacherReports() {
     }
     load()
   }, [profile?.id])
+
   async function loadSessionAnswers(sessionId: string) {
     setLoadingAnswers(true)
     const { data } = await supabase
@@ -380,5 +287,98 @@ export default function TeacherReports() {
         )}
       </div>
     </div>
+{/* Modal de detalle por estudiante */}
+    {selectedSession && (
+      <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-parchment-50 rounded-sm shadow-raised w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-parchment-200 animate-slide-up">
+          <div className="flex items-center justify-between p-6 border-b border-parchment-200 sticky top-0 bg-parchment-50">
+            <div>
+              <h2 className="font-display text-xl font-semibold text-ink-800">{selectedSession.student_name}</h2>
+              <p className="text-sm text-ink-500 font-body">{selectedSession.assignment_title} · {selectedSession.topic}</p>
+            </div>
+            <button onClick={() => setSelectedSession(null)} className="text-ink-400 hover:text-ink-700 p-1 text-xl">✕</button>
+          </div>
+
+          <div className="p-6 space-y-4">
+            {loadingAnswers ? (
+              <div className="text-center py-8">
+                <div className="spinner mx-auto mb-3" />
+                <p className="text-ink-500 font-body text-sm">Cargando respuestas…</p>
+              </div>
+            ) : sessionAnswers.length === 0 ? (
+              <p className="text-ink-400 font-body text-center py-8">Sin respuestas registradas.</p>
+            ) : (
+              sessionAnswers.map((answer: any) => {
+                const q = answer.question
+                const isOpen = q?.question_type === 'open'
+                return (
+                  <div key={answer.id} className="bg-white rounded border border-parchment-200 p-4">
+                    <div className="flex items-start justify-between gap-4 mb-2">
+                      <p className="font-body font-medium text-ink-800 flex-1">{q?.question_text}</p>
+                      <span className="text-xs font-mono bg-sepia-100 text-ink-500 px-2 py-1 rounded flex-shrink-0">
+                        {Math.floor(q?.timestamp_seconds / 60)}:{String(Math.floor(q?.timestamp_seconds % 60)).padStart(2, '0')}
+                      </span>
+                    </div>
+                    <p className="text-sm font-body text-ink-600 mb-3">
+                      <span className="font-medium">Respuesta: </span>
+                      {answer.answer_text ?? <span className="text-ink-300 italic">Sin respuesta</span>}
+                    </p>
+                    {isOpen ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-ink-500 font-body">Calificación:</span>
+                        {[
+                          { label: 'Completa', value: 1 },
+                          { label: 'Parcial', value: 0.5 },
+                          { label: 'Incorrecta', value: 0 },
+                        ].map(opt => (
+                          <button
+                            key={opt.value}
+                            onClick={() => gradeOpenAnswer(answer.id, q.points, opt.value)}
+                            disabled={savingScore === answer.id}
+                            className={`text-xs px-3 py-1.5 rounded font-body font-medium transition-colors ${
+                              answer.points_earned === Math.round(q.points * opt.value)
+                                ? 'bg-crimson-500 text-parchment-50'
+                                : 'bg-sepia-100 text-ink-600 hover:bg-sepia-200'
+                            }`}
+                          >
+                            {savingScore === answer.id ? '…' : opt.label}
+                          </button>
+                        ))}
+                        <span className="text-xs font-mono text-ink-400 ml-1">
+                          {answer.points_earned}/{q.points} pts
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-mono px-2 py-1 rounded ${answer.is_correct ? 'bg-green-700/10 text-green-700' : 'bg-crimson-500/10 text-crimson-500'}`}>
+                          {answer.is_correct ? '✓ Correcta' : '✗ Incorrecta'}
+                        </span>
+                        <span className="text-xs font-mono text-ink-400">
+                          {answer.points_earned}/{q.points} pts
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
+
+          <div className="p-6 pt-0 border-t border-parchment-200 mt-4 flex justify-between items-center">
+            <div>
+              <span className="text-sm font-body text-ink-600">Calificación actual: </span>
+              <span className="font-display text-2xl font-bold text-ink-900">{selectedSession.score}</span>
+              <span className="font-mono text-ink-400">/100</span>
+            </div>
+            <button
+              onClick={() => setSelectedSession(null)}
+              className="bg-ink-800 text-parchment-100 px-5 py-2.5 rounded-sm font-body font-medium hover:bg-ink-900 transition-colors"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   )
 }
