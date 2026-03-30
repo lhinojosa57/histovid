@@ -223,17 +223,21 @@ export default function WatchVideo() {
 
   // ── Continue after question ────────────────────────────────────────────────
   const continueVideo = useCallback(() => {
-    const newAnswered = new Set([...answeredQuestions, activeQuestion?.id ?? ''])
-    setActivityState('playing')
-    setActiveQuestion(null)
-    setCurrentAnswer('')
+  const newAnswered = new Set([...answeredQuestions, activeQuestion?.id ?? ''])
+  setActivityState('playing')
+  setActiveQuestion(null)
+  setCurrentAnswer('')
 
-    if (iframeRef.current && assignment?.video_url) {
-      iframeRef.current.src = getEmbedUrl(assignment.video_url, true)
-    }
+  const url = assignment?.video_url ?? ''
+  const isDrive = url.includes('drive.google.com')
 
-    startVideoTimer(questions, newAnswered, assignment?.video_url ?? '')
-  }, [answeredQuestions, activeQuestion, assignment, questions, startVideoTimer])
+  if (iframeRef.current && url) {
+    iframeRef.current.src = getEmbedUrl(url, !isDrive)
+  }
+
+  // For Drive, student needs to press play manually — timer still runs
+  startVideoTimer(questions, newAnswered, url)
+}, [answeredQuestions, activeQuestion, assignment, questions, startVideoTimer])
 
   // ── Finish activity ────────────────────────────────────────────────────────
   const handleFinish = async () => {
