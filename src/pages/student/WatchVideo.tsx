@@ -1,81 +1,61 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import ReactPlayer from 'react-player'
 import { useAuth } from '@/lib/auth'
 import { supabase, VideoAssignment, Question, StudentSession, StudentAnswer } from '@/lib/supabase'
-import { CheckCircle, ArrowLeft, Send, ChevronRight } from 'lucide-react'
+import { CheckCircle, ArrowLeft, Send } from 'lucide-react'
 
-type QuestionState = 'playing' | 'paused_question' | 'completed'
+type ActivityState = 'playing' | 'paused_question' | 'time_up'
+
+// ─── URL helpers ──────────────────────────────────────────────────────────────
+
+function getEmbedUrl(url: string, autoplay: boolean): string {
+  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/)
+  if (driveMatch) {
+    return `https://drive.google.com/file/d/${driveMatch[1]}/preview`
+  }
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/)
+  if (ytMatch) {
+    const params = autoplay
+      ? '?autoplay=1&rel=0&modestbranding=1&iv_load_policy=3&controls=0'
+      : '?autoplay=0&rel=0&modestbranding=1&iv_load_policy=3&controls=0'
+    return `https://www.youtube-nocookie.com/embed/${ytMatch[1]}` + params
+  }
+  return url
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function WatchVideo() {
   const { assignmentId } = useParams()
   const { profile } = useAuth()
   const navigate = useNavigate()
 
-  const playerRef = useRef<ReactPlayer>(null)
   const lastUpdateRef = useRef<number>(Date.now())
   const durationAccRef = useRef<number>(0)
+  const videoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const questionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const videoSecondsRef = useRef<number>(0)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
 
   const [assignment, setAssignment] = useState<VideoAssignment | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
   const [session, setSession] = useState<StudentSession | null>(null)
-  const [answers, setAnswers] = useState<Record<string, StudentAnswer>>({})
 
-  const [state, setState] = useState<QuestionState>('playing')
+  const [activityState, setActivityState] = useState<ActivityState>('playing')
   const [activeQuestion, setActiveQuestion] = useState<Question | null>(null)
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<string>>(new Set())
   const [currentAnswer, setCurrentAnswer] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [answerResult, setAnswerResult] = useState<{ correct: boolean; points: number } | null>(null)
-  const [playing, setPlaying] = useState(false)
+  const [isTimeUp, setIsTimeUp] = useState(false)
+
+  const [videoStarted, setVideoStarted] = useState(false)
   const [loading, setLoading] = useState(true)
   const [completed, setCompleted] = useState(false)
-  const [driveReady, setDriveReady] = useState(false)
-// Timer para videos de Drive
-const driveTimerRef = useRef<number>(0)
-const driveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-const isDrive = assignment?.video_url?.includes('drive.google.com') ?? false
+  const [finalScore, setFinalScore] = useState(0)
 
-useEffect(() => {
-  if (!isDrive || !driveReady || completed) {
-    if (driveIntervalRef.current) {
-      clearInterval(driveIntervalRef.current)
-      driveIntervalRef.current = null
-    }
-    return
-  }
-
-  driveTimerRef.current = 0
-
-  driveIntervalRef.current = setInterval(() => {
-    driveTimerRef.current += 0.5
-
-    for (const q of questions) {
-      if (answeredQuestions.has(q.id)) continue
-      if (driveTimerRef.current >= q.timestamp_seconds && 
-          driveTimerRef.current < q.timestamp_seconds + 1) {
-        clearInterval(driveIntervalRef.current!)
-        driveIntervalRef.current = null
-        setActiveQuestion(q)
-        setState('paused_question')
-        setCurrentAnswer('')
-        setAnswerResult(null)
-        break
-      }
-    }
-  }, 500)
-
-  return () => {
-    if (driveIntervalRef.current) {
-      clearInterval(driveIntervalRef.current)
-      driveIntervalRef.current = null
-    }
-  }
-}, [isDrive, driveReady, completed, questions, answeredQuestions])
-
+  // ── Load data ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!profile?.id || !assignmentId) return
-
     async function load() {
       const [asgRes, qRes] = await Promise.all([
         supabase.from('video_assignments').select('*, group:groups(name)').eq('id', assignmentId).single(),
@@ -103,6 +83,7 @@ useEffect(() => {
       setSession(sess)
 
       if (sess?.is_completed) {
+        setFinalScore(Math.round(sess.score ?? 0))
         setCompleted(true)
         setLoading(false)
         return
@@ -110,66 +91,106 @@ useEffect(() => {
 
       if (sess?.id) {
         const { data: existingAnswers } = await supabase
-          .from('student_answers')
-          .select('*, question:questions(*)')
-          .eq('session_id', sess.id)
-        const ansMap: Record<string, StudentAnswer> = {}
+          .from('student_answers').select('*').eq('session_id', sess.id)
         const answeredSet = new Set<string>()
-        ;(existingAnswers ?? []).forEach((a: StudentAnswer) => {
-          ansMap[a.question_id] = a
-          answeredSet.add(a.question_id)
-        })
-        setAnswers(ansMap)
+        ;(existingAnswers ?? []).forEach((a: StudentAnswer) => answeredSet.add(a.question_id))
         setAnsweredQuestions(answeredSet)
-      }
-
-      if (sess?.max_video_position && sess.max_video_position > 0) {
-        setTimeout(() => {
-          playerRef.current?.seekTo(sess.max_video_position, 'seconds')
-        }, 1500)
       }
 
       lastUpdateRef.current = Date.now()
       durationAccRef.current = sess?.duration_seconds ?? 0
       setLoading(false)
-      setPlaying(true)
     }
     load()
   }, [profile?.id, assignmentId])
 
+  // ── Duration tracker ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!session || completed) return
     const interval = setInterval(async () => {
-      const now = Date.now()
-      const elapsed = Math.floor((now - lastUpdateRef.current) / 1000)
-      lastUpdateRef.current = now
+      const elapsed = Math.floor((Date.now() - lastUpdateRef.current) / 1000)
+      lastUpdateRef.current = Date.now()
       durationAccRef.current += elapsed
-      await supabase.from('student_sessions').update({ duration_seconds: durationAccRef.current }).eq('id', session.id)
+      await supabase.from('student_sessions')
+        .update({ duration_seconds: durationAccRef.current })
+        .eq('id', session.id)
     }, 15000)
     return () => clearInterval(interval)
   }, [session, completed])
 
-  const handleProgress = useCallback(({ playedSeconds }: { playedSeconds: number }) => {
-    if (session && playedSeconds > (session.max_video_position ?? 0)) {
-      supabase.from('student_sessions').update({ max_video_position: playedSeconds }).eq('id', session.id)
+  // ── Trigger question ───────────────────────────────────────────────────────
+  const triggerQuestion = useCallback((q: Question, videoUrl: string) => {
+    if (iframeRef.current) {
+      iframeRef.current.src = getEmbedUrl(videoUrl, false)
     }
-    for (const q of questions) {
-      if (answeredQuestions.has(q.id)) continue
-      const diff = Math.abs(playedSeconds - q.timestamp_seconds)
-      if (diff < 0.8) {
-        setPlaying(false)
-        setActiveQuestion(q)
-        setState('paused_question')
-        setCurrentAnswer('')
-        setAnswerResult(null)
-        break
-      }
-    }
-  }, [questions, answeredQuestions, session])
+    setActiveQuestion(q)
+    setCurrentAnswer('')
+    setIsTimeUp(false)
+    setActivityState('paused_question')
 
+    if (questionTimerRef.current) clearInterval(questionTimerRef.current)
+    const limit = q.question_type === 'open' ? 30 : 10
+    let elapsed = 0
+    questionTimerRef.current = setInterval(() => {
+      elapsed++
+      if (elapsed >= limit) {
+        clearInterval(questionTimerRef.current!)
+        questionTimerRef.current = null
+        // Time up — save as incorrect
+        setIsTimeUp(true)
+        setActivityState('time_up')
+        setAnsweredQuestions(prev => new Set([...prev, q.id]))
+        if (session && profile?.id) {
+          supabase.from('student_answers').upsert({
+            session_id: session.id,
+            question_id: q.id,
+            student_id: profile.id,
+            answer_text: null,
+            is_correct: q.question_type === 'open' ? null : false,
+            points_earned: 0,
+          })
+        }
+      }
+    }, 1000)
+  }, [session, profile])
+
+  // ── Start video timer ──────────────────────────────────────────────────────
+  const startVideoTimer = useCallback((currentQuestions: Question[], currentAnswered: Set<string>, videoUrl: string) => {
+    if (videoTimerRef.current) clearInterval(videoTimerRef.current)
+    videoTimerRef.current = setInterval(() => {
+      videoSecondsRef.current += 0.5
+      for (const q of currentQuestions) {
+        if (currentAnswered.has(q.id)) continue
+        if (
+          videoSecondsRef.current >= q.timestamp_seconds &&
+          videoSecondsRef.current < q.timestamp_seconds + 1
+        ) {
+          clearInterval(videoTimerRef.current!)
+          videoTimerRef.current = null
+          triggerQuestion(q, videoUrl)
+          break
+        }
+      }
+    }, 500)
+  }, [triggerQuestion])
+
+  // ── Start video ────────────────────────────────────────────────────────────
+  const handleStartVideo = () => {
+    videoSecondsRef.current = 0
+    setVideoStarted(true)
+    startVideoTimer(questions, answeredQuestions, assignment?.video_url ?? '')
+  }
+
+  // ── Submit answer ──────────────────────────────────────────────────────────
   const submitAnswer = async () => {
-    if (!activeQuestion || !session || !profile?.id || !currentAnswer.trim()) return
+    if (!activeQuestion || !session || !profile?.id) return
+    if (activeQuestion.question_type !== 'open' && !currentAnswer.trim()) return
     setSubmitting(true)
+
+    if (questionTimerRef.current) {
+      clearInterval(questionTimerRef.current)
+      questionTimerRef.current = null
+    }
 
     let isCorrect: boolean | null = null
     let pointsEarned = 0
@@ -194,62 +215,51 @@ useEffect(() => {
       points_earned: pointsEarned,
     })
 
-    setAnswerResult({ correct: isCorrect ?? true, points: pointsEarned })
     setAnsweredQuestions(prev => new Set([...prev, activeQuestion.id]))
     setSubmitting(false)
+    setIsTimeUp(false)
+    setActivityState('time_up')
   }
 
-  const continueVideo = () => {
-  setState('playing')
-  setActiveQuestion(null)
-  setAnswerResult(null)
-  setCurrentAnswer('')
-  setPlaying(true)
-  
-  // Restart Drive timer from current position
-  if (isDrive && driveReady) {
-    driveIntervalRef.current = setInterval(() => {
-      driveTimerRef.current += 0.5
-      for (const q of questions) {
-        if (answeredQuestions.has(q.id)) continue
-        if (driveTimerRef.current >= q.timestamp_seconds &&
-            driveTimerRef.current < q.timestamp_seconds + 1) {
-          clearInterval(driveIntervalRef.current!)
-          driveIntervalRef.current = null
-          setActiveQuestion(q)
-          setState('paused_question')
-          setCurrentAnswer('')
-          setAnswerResult(null)
-          break
-        }
-      }
-    }, 500)
-  }
-}
+  // ── Continue after question ────────────────────────────────────────────────
+  const continueVideo = useCallback(() => {
+    const newAnswered = new Set([...answeredQuestions, activeQuestion?.id ?? ''])
+    setActivityState('playing')
+    setActiveQuestion(null)
+    setCurrentAnswer('')
 
-  const handleVideoEnd = async () => {
-    if (!session || !profile?.id) return
-    setPlaying(false)
-
-    const unanswered = questions.filter(q => !answeredQuestions.has(q.id))
-    if (unanswered.length > 0) {
-      setActiveQuestion(unanswered[0])
-      setState('paused_question')
-      return
+    if (iframeRef.current && assignment?.video_url) {
+      iframeRef.current.src = getEmbedUrl(assignment.video_url, true)
     }
+
+    startVideoTimer(questions, newAnswered, assignment?.video_url ?? '')
+  }, [answeredQuestions, activeQuestion, assignment, questions, startVideoTimer])
+
+  // ── Finish activity ────────────────────────────────────────────────────────
+  const handleFinish = async () => {
+    if (!session) return
+    if (videoTimerRef.current) clearInterval(videoTimerRef.current)
+    if (questionTimerRef.current) clearInterval(questionTimerRef.current)
 
     const elapsed = Math.floor((Date.now() - lastUpdateRef.current) / 1000)
     durationAccRef.current += elapsed
 
-    await supabase.from('student_sessions').update({
-      is_completed: true,
-      completed_at: new Date().toISOString(),
-      duration_seconds: durationAccRef.current,
-    }).eq('id', session.id)
+    const { data: updatedSess } = await supabase
+      .from('student_sessions')
+      .update({
+        is_completed: true,
+        completed_at: new Date().toISOString(),
+        duration_seconds: durationAccRef.current,
+      })
+      .eq('id', session.id)
+      .select()
+      .single()
 
+    setFinalScore(Math.round(updatedSess?.score ?? 0))
     setCompleted(true)
   }
 
+  // ── Completed screen ───────────────────────────────────────────────────────
   if (completed) {
     return (
       <div className="min-h-screen bg-sepia-100 flex items-center justify-center p-4">
@@ -259,15 +269,13 @@ useEffect(() => {
           </div>
           <h2 className="font-display text-2xl font-bold text-ink-900 mb-2">¡Actividad completada!</h2>
           <p className="font-body text-ink-600 mb-6">{assignment?.title}</p>
-          {session && (
-            <div className="bg-sepia-100 rounded p-4 mb-6 border border-parchment-200">
-              <p className="text-xs text-ink-500 font-mono uppercase tracking-wider mb-1">Tu calificación</p>
-              <p className={`font-display text-5xl font-bold ${session.score >= 80 ? 'text-green-700' : session.score >= 60 ? 'text-gold-600' : 'text-crimson-500'}`}>
-                {Math.round(session.score)}
-              </p>
-              <p className="font-mono text-ink-400 text-sm">/100</p>
-            </div>
-          )}
+          <div className="bg-sepia-100 rounded p-4 mb-6 border border-parchment-200">
+            <p className="text-xs text-ink-500 font-mono uppercase tracking-wider mb-1">Tu calificación</p>
+            <p className={`font-display text-5xl font-bold ${finalScore >= 80 ? 'text-green-700' : finalScore >= 60 ? 'text-gold-600' : 'text-crimson-500'}`}>
+              {finalScore}
+            </p>
+            <p className="font-mono text-ink-400 text-sm">/100</p>
+          </div>
           <button onClick={() => navigate('/student')} className="w-full bg-crimson-500 text-parchment-50 py-3 rounded-sm font-body font-medium hover:bg-crimson-600 transition-colors">
             Volver al inicio
           </button>
@@ -287,8 +295,11 @@ useEffect(() => {
     )
   }
 
- return (
+  const showOverlay = activityState === 'paused_question' || activityState === 'time_up'
+
+  return (
     <div className="min-h-screen bg-ink-900 flex flex-col">
+      {/* Top bar */}
       <div className="flex items-center gap-4 px-5 py-3 border-b border-ink-700">
         <button onClick={() => navigate('/student')} className="text-ink-400 hover:text-parchment-200 transition-colors">
           <ArrowLeft className="w-5 h-5" />
@@ -297,99 +308,75 @@ useEffect(() => {
           <p className="font-display text-parchment-100 font-semibold truncate">{assignment?.title}</p>
           <p className="text-ink-400 text-xs font-body truncate">{assignment?.topic} · {(assignment as any)?.group?.name}</p>
         </div>
-        {!completed && (
+        {videoStarted && activityState === 'playing' && (
           <button
-            onClick={handleVideoEnd}
+            onClick={handleFinish}
             className="flex items-center gap-2 bg-crimson-500 text-parchment-50 px-4 py-2 rounded-sm font-body text-sm font-medium hover:bg-crimson-600 transition-colors"
           >
             <CheckCircle className="w-4 h-4" />
             Terminar actividad
           </button>
         )}
-
       </div>
-      <div className="flex-1 flex flex-col lg:flex-row gap-0">
-        <div className="flex-1 bg-black flex items-center justify-center relative min-h-0">
-          <div className="w-full aspect-video max-h-[calc(100vh-120px)]">
-  {assignment?.video_url?.includes('drive.google.com') ? (
-  <div className="relative w-full h-full">
-    <iframe
-      src={getVideoUrl(assignment.video_url)}
-      width="100%"
-      height="100%"
-      allow="autoplay"
-      allowFullScreen={false}
-      style={{ border: 'none' }}
-    />
-    {!driveReady && (
-      <div className="absolute inset-0 bg-ink-900 flex items-center justify-center">
-        <button
-          onClick={() => {
-            setDriveReady(true)
-            driveTimerRef.current = 0
-          }}
-          className="flex items-center gap-3 bg-crimson-500 text-parchment-50 px-8 py-4 rounded-sm font-display text-xl font-semibold hover:bg-crimson-600 transition-colors shadow-raised"
-        >
-          ▶ Iniciar video
-        </button>
-      </div>
-    )}
-  </div>
-  ) : (
-  <ReactPlayer
-    ref={playerRef}
-    url={assignment?.video_url}
-    playing={playing}
-    controls={true}
-    width="100%"
-    height="100%"
-    onProgress={handleProgress}
-    onEnded={handleVideoEnd}
-    progressInterval={500}
-    config={{
-      youtube: { playerVars: { disablekb: 1, modestbranding: 1, rel: 0, controls: 0 } },
-    }}
-  />
-)}
-</div>
 
-          {state === 'paused_question' && (
-            <div className="absolute inset-0 bg-ink-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+      {/* Video */}
+      <div className="flex-1 bg-black relative flex items-center justify-center">
+        <div className="w-full aspect-video max-h-[calc(100vh-64px)] relative">
+          <iframe
+            ref={iframeRef}
+            src={videoStarted ? getEmbedUrl(assignment?.video_url ?? '', true) : 'about:blank'}
+            width="100%"
+            height="100%"
+            allow="autoplay; encrypted-media"
+            allowFullScreen={false}
+            style={{ border: 'none', display: 'block' }}
+          />
+
+          {/* Start overlay */}
+          {!videoStarted && (
+            <div className="absolute inset-0 bg-ink-900 flex items-center justify-center">
+              <button
+                onClick={handleStartVideo}
+                className="flex items-center gap-3 bg-crimson-500 text-parchment-50 px-10 py-5 rounded-sm font-display text-2xl font-semibold hover:bg-crimson-600 transition-colors shadow-raised"
+              >
+                ▶ Iniciar video
+              </button>
+            </div>
+          )}
+
+          {/* Question overlay */}
+          {showOverlay && activeQuestion && (
+            <div className="absolute inset-0 bg-ink-900 flex items-center justify-center p-4">
               <div className="w-full max-w-lg animate-slide-up">
                 <QuestionOverlay
-                  question={activeQuestion!}
+                  question={activeQuestion}
                   currentAnswer={currentAnswer}
                   onAnswer={setCurrentAnswer}
                   onSubmit={submitAnswer}
                   submitting={submitting}
-                  result={answerResult}
+                  isTimeUp={isTimeUp}
+                  activityState={activityState}
                   onContinue={continueVideo}
                 />
               </div>
             </div>
           )}
-        </div>       
+        </div>
       </div>
     </div>
   )
 }
 
-function getVideoUrl(url: string): string {
-  // Convert Google Drive share URL to embed URL
-  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/)
-  if (driveMatch) {
-    return `https://drive.google.com/file/d/${driveMatch[1]}/preview`
-  }
-  return url
-}
+// ─── Question Overlay ─────────────────────────────────────────────────────────
 
-function QuestionOverlay({ question, currentAnswer, onAnswer, onSubmit, submitting, result, onContinue }: {
+function QuestionOverlay({ question, currentAnswer, onAnswer, onSubmit, submitting, isTimeUp, activityState, onContinue }: {
   question: Question
   currentAnswer: string
   onAnswer: (a: string) => void
   onSubmit: () => void
   submitting: boolean
-  result: { correct: boolean; points: number } | null
+  isTimeUp: boolean
+  activityState: string
   onContinue: () => void
 }) {
   const typeLabel = {
@@ -397,6 +384,9 @@ function QuestionOverlay({ question, currentAnswer, onAnswer, onSubmit, submitti
     true_false: 'Verdadero / Falso',
     open: 'Pregunta abierta',
   }[question.question_type]
+
+  const showForm = activityState === 'paused_question'
+  const showContinue = activityState === 'time_up'
 
   return (
     <div className="bg-parchment-50 rounded-sm shadow-raised border border-parchment-200 overflow-hidden">
@@ -406,25 +396,27 @@ function QuestionOverlay({ question, currentAnswer, onAnswer, onSubmit, submitti
       </div>
 
       <div className="p-5">
-        <p className="font-display text-lg font-semibold text-ink-800 mb-5 leading-snug">{question.question_text}</p>
+        <p className="font-display text-lg font-semibold text-ink-800 mb-5 leading-snug">
+          {question.question_text}
+        </p>
 
-        {result !== null ? (
-          <div className={`rounded p-4 mb-4 border ${result.correct ? 'bg-green-700/10 border-green-700/20' : 'bg-crimson-500/10 border-crimson-500/20'}`}>
-            <p className={`font-body font-semibold mb-1 ${result.correct ? 'text-green-700' : 'text-crimson-500'}`}>
-              {question.question_type === 'open' ? '✓ Respuesta registrada' : result.correct ? '✓ ¡Correcto!' : '✗ Incorrecto'}
-            </p>
-            <p className="text-sm text-ink-600 font-body">
-              {question.question_type === 'open'
-                ? `+${result.points} puntos por responder`
-                : result.correct
-                ? `+${result.points} puntos`
-                : question.correct_answer
-                ? `La respuesta correcta era: ${question.question_type === 'true_false' ? (question.correct_answer === 'true' ? 'Verdadero' : 'Falso') : question.options?.find(o => o.id === question.correct_answer)?.text ?? question.correct_answer}`
-                : ''
-              }
-            </p>
+        {/* Time up */}
+        {isTimeUp && (
+          <div className="rounded p-4 mb-4 border bg-crimson-500/10 border-crimson-500/20">
+            <p className="font-body font-semibold text-crimson-500">⏱ Tiempo agotado</p>
+            <p className="text-sm text-ink-600 font-body mt-1">No se registró respuesta correcta.</p>
           </div>
-        ) : (
+        )}
+
+        {/* Answer confirmed */}
+        {showContinue && !isTimeUp && (
+          <div className="rounded p-4 mb-4 border bg-green-700/10 border-green-700/20">
+            <p className="font-body font-semibold text-green-700">✓ Respuesta registrada</p>
+          </div>
+        )}
+
+        {/* Form */}
+        {showForm && (
           <>
             {question.question_type === 'multiple_choice' && question.options && (
               <div className="space-y-2 mb-4">
@@ -458,17 +450,25 @@ function QuestionOverlay({ question, currentAnswer, onAnswer, onSubmit, submitti
                 className="w-full border border-parchment-300 rounded px-3 py-2.5 font-body text-sm text-ink-800 bg-white focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20 resize-none mb-4"
               />
             )}
+
+            <button
+              onClick={onSubmit}
+              disabled={submitting || (question.question_type !== 'open' && !currentAnswer.trim())}
+              className="w-full flex items-center justify-center gap-2 bg-ink-800 text-parchment-100 py-3 rounded-sm font-body font-medium hover:bg-ink-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Send className="w-4 h-4" />
+              {submitting ? 'Enviando…' : 'Responder'}
+            </button>
           </>
         )}
 
-        {result !== null ? (
-          <button onClick={onContinue} className="w-full flex items-center justify-center gap-2 bg-crimson-500 text-parchment-50 py-3 rounded-sm font-body font-medium hover:bg-crimson-600 transition-colors">
-            Continuar video <ChevronRight className="w-4 h-4" />
-          </button>
-        ) : (
-          <button onClick={onSubmit} disabled={!currentAnswer.trim() || submitting} className="w-full flex items-center justify-center gap-2 bg-ink-800 text-parchment-100 py-3 rounded-sm font-body font-medium hover:bg-ink-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-            <Send className="w-4 h-4" />
-            {submitting ? 'Enviando…' : 'Responder'}
+        {/* Continue */}
+        {showContinue && (
+          <button
+            onClick={onContinue}
+            className="w-full flex items-center justify-center gap-2 bg-crimson-500 text-parchment-50 py-3 rounded-sm font-body font-medium hover:bg-crimson-600 transition-colors mt-2"
+          >
+            Continuar video ▶
           </button>
         )}
       </div>
