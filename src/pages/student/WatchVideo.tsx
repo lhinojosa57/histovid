@@ -9,10 +9,6 @@ type ActivityState = 'playing' | 'paused_question' | 'time_up'
 // ─── URL helpers ──────────────────────────────────────────────────────────────
 
 function getEmbedUrl(url: string, autoplay: boolean): string {
-  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/)
-  if (driveMatch) {
-    return `https://drive.google.com/file/d/${driveMatch[1]}/preview`
-  }
   const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/)
   if (ytMatch) {
     const params = autoplay
@@ -228,15 +224,11 @@ export default function WatchVideo() {
   setActiveQuestion(null)
   setCurrentAnswer('')
 
-  const url = assignment?.video_url ?? ''
-  const isDrive = url.includes('drive.google.com')
-
-  if (iframeRef.current && url) {
-    iframeRef.current.src = getEmbedUrl(url, !isDrive)
+  if (iframeRef.current && assignment?.video_url) {
+    iframeRef.current.src = getEmbedUrl(assignment.video_url, true)
   }
 
-  // For Drive, student needs to press play manually — timer still runs
-  startVideoTimer(questions, newAnswered, url)
+  startVideoTimer(questions, newAnswered, assignment?.video_url ?? '')
 }, [answeredQuestions, activeQuestion, assignment, questions, startVideoTimer])
 
   // ── Finish activity ────────────────────────────────────────────────────────
