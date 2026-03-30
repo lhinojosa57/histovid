@@ -36,10 +36,12 @@ export default function AuthCallback() {
         // Update profile role to teacher
         await supabase.from('profiles').update({ role: 'teacher' }).eq('email', email)
         navigate('/teacher', { replace: true })
+        window.location.reload()
       } else {
         // Update profile role to student
         await supabase.from('profiles').update({ role: 'student' }).eq('email', email)
         navigate('/student', { replace: true })
+        window.location.reload()
       }
     }
 
