@@ -162,6 +162,7 @@ export default function TeacherReports() {
   }
 
   return (
+    <>
     <div className="p-8 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -287,7 +288,7 @@ export default function TeacherReports() {
         )}
       </div>
     </div>
-    <>
+    
 {/* Modal de detalle por estudiante */}
     {selectedSession && (
       <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
