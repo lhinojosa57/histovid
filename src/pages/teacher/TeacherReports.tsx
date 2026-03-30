@@ -101,7 +101,19 @@ export default function TeacherReports() {
     .eq('id', answerId)
   // Reload answers to reflect changes
   const sessionId = sessionAnswers.find(a => a.id === answerId)?.session_id
-  if (sessionId) await loadSessionAnswers(sessionId)
+ if (sessionId) await loadSessionAnswers(sessionId)
+  
+  // Refresh the score shown in the modal
+  const { data: updatedSess } = await supabase
+    .from('student_sessions')
+    .select('score')
+    .eq('id', sessionId)
+    .single()
+  
+  if (updatedSess) {
+    setSelectedSession((prev: any) => ({ ...prev, score: Math.round(updatedSess.score) }))
+  }
+  
   setSavingScore(null)
   }
 
