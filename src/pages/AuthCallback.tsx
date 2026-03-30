@@ -1,48 +1,40 @@
 import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 
-export default function AuthCallback() {
-  const navigate = useNavigate()
+const TEACHER_EMAILS = [
+  'lhinojosa@nikolatesla.edu.mx',
+  'iflores@nikolatesla.edu.mx',
+  'aflores@nikolatesla.edu.mx',
+  'jsamano@nikolatesla.edu.mx',
+]
 
+export default function AuthCallback() {
   useEffect(() => {
     async function handleCallback() {
       const { data, error } = await supabase.auth.getSession()
-
       if (error || !data.session) {
         setTimeout(async () => {
           const { data: retry } = await supabase.auth.getSession()
           if (retry.session) {
-            await redirectUser(retry.session.user.email ?? '')
+            await redirect(retry.session.user.email ?? '')
           } else {
-            navigate('/login', { replace: true })
+            window.location.href = '/login'
           }
         }, 2000)
         return
       }
-
-      await redirectUser(data.session.user.email ?? '')
+      await redirect(data.session.user.email ?? '')
     }
 
-  async function redirectUser(email: string) {
-  const { data: teacher, error: teacherError } = await supabase
-    .from('teachers')
-    .select('email')
-    .eq('email', email)
-    .single()
+    async function redirect(email: string) {
+      const isTeacher = TEACHER_EMAILS.includes(email)
+      const role = isTeacher ? 'teacher' : 'student'
+      await supabase.from('profiles').update({ role }).eq('email', email)
+      window.location.href = isTeacher ? '/teacher' : '/student'
+    }
 
-  console.log('teacher query result:', teacher, 'error:', teacherError)
-
-  if (teacher) {
-    await supabase.from('profiles').update({ role: 'teacher' }).eq('email', email)
-    window.location.href = '/teacher'
-  } else {
-    await supabase.from('profiles').update({ role: 'student' }).eq('email', email)
-    window.location.href = '/student'
-  }
-} 
     handleCallback()
-  }, [navigate])
+  }, [])
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-sepia-100">
