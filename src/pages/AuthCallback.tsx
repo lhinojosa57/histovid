@@ -25,13 +25,13 @@ export default function AuthCallback() {
     }
 
   async function redirectUser(email: string) {
-  const { data: teacher } = await supabase
+  const { data: teacher, error: teacherError } = await supabase
     .from('teachers')
     .select('email')
     .eq('email', email)
     .single()
 
-  console.log('teacher query result:', teacher, 'error:', error)
+  console.log('teacher query result:', teacher, 'error:', teacherError)
 
   if (teacher) {
     await supabase.from('profiles').update({ role: 'teacher' }).eq('email', email)
