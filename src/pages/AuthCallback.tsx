@@ -24,27 +24,21 @@ export default function AuthCallback() {
       await redirectUser(data.session.user.email ?? '')
     }
 
-    async function redirectUser(email: string) {
-      // Check if email is in teachers table
-      const { data: teacher } = await supabase
-        .from('teachers')
-        .select('email')
-        .eq('email', email)
-        .single()
+  async function redirectUser(email: string) {
+  const { data: teacher } = await supabase
+    .from('teachers')
+    .select('email')
+    .eq('email', email)
+    .single()
 
-      if (teacher) {
-        // Update profile role to teacher
-        await supabase.from('profiles').update({ role: 'teacher' }).eq('email', email)
-        navigate('/teacher', { replace: true })
-        window.location.reload()
-      } else {
-        // Update profile role to student
-        await supabase.from('profiles').update({ role: 'student' }).eq('email', email)
-        navigate('/student', { replace: true })
-        window.location.reload()
-      }
-    }
-
+  if (teacher) {
+    await supabase.from('profiles').update({ role: 'teacher' }).eq('email', email)
+    window.location.href = '/teacher'
+  } else {
+    await supabase.from('profiles').update({ role: 'student' }).eq('email', email)
+    window.location.href = '/student'
+  }
+} 
     handleCallback()
   }, [navigate])
 
