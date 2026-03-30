@@ -19,6 +19,102 @@ interface ReportRow {
   is_completed: boolean
 }
 
+{/* Modal de detalle por estudiante */}
+{selectedSession && (
+  <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="bg-parchment-50 rounded-sm shadow-raised w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-parchment-200 animate-slide-up">
+      <div className="flex items-center justify-between p-6 border-b border-parchment-200 sticky top-0 bg-parchment-50">
+        <div>
+          <h2 className="font-display text-xl font-semibold text-ink-800">{selectedSession.student_name}</h2>
+          <p className="text-sm text-ink-500 font-body">{selectedSession.assignment_title} · {selectedSession.topic}</p>
+        </div>
+        <button onClick={() => setSelectedSession(null)} className="text-ink-400 hover:text-ink-700 p-1 text-xl">✕</button>
+      </div>
+
+      <div className="p-6 space-y-4">
+        {loadingAnswers ? (
+          <div className="text-center py-8">
+            <div className="spinner mx-auto mb-3" />
+            <p className="text-ink-500 font-body text-sm">Cargando respuestas…</p>
+          </div>
+        ) : sessionAnswers.length === 0 ? (
+          <p className="text-ink-400 font-body text-center py-8">Sin respuestas registradas.</p>
+        ) : (
+          sessionAnswers.map((answer: any) => {
+            const q = answer.question
+            const isOpen = q?.question_type === 'open'
+            return (
+              <div key={answer.id} className="bg-white rounded border border-parchment-200 p-4">
+                <div className="flex items-start justify-between gap-4 mb-2">
+                  <p className="font-body font-medium text-ink-800 flex-1">{q?.question_text}</p>
+                  <span className="text-xs font-mono bg-sepia-100 text-ink-500 px-2 py-1 rounded flex-shrink-0">
+                    {Math.floor(q?.timestamp_seconds / 60)}:{String(Math.floor(q?.timestamp_seconds % 60)).padStart(2, '0')}
+                  </span>
+                </div>
+
+                <p className="text-sm font-body text-ink-600 mb-3">
+                  <span className="font-medium">Respuesta: </span>
+                  {answer.answer_text ?? <span className="text-ink-300 italic">Sin respuesta</span>}
+                </p>
+
+                {isOpen ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-ink-500 font-body">Calificación:</span>
+                    {[
+                      { label: 'Completa', value: 1 },
+                      { label: 'Parcial', value: 0.5 },
+                      { label: 'Incorrecta', value: 0 },
+                    ].map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => gradeOpenAnswer(answer.id, q.points, opt.value)}
+                        disabled={savingScore === answer.id}
+                        className={`text-xs px-3 py-1.5 rounded font-body font-medium transition-colors ${
+                          answer.points_earned === Math.round(q.points * opt.value)
+                            ? 'bg-crimson-500 text-parchment-50'
+                            : 'bg-sepia-100 text-ink-600 hover:bg-sepia-200'
+                        }`}
+                      >
+                        {savingScore === answer.id ? '…' : opt.label}
+                      </button>
+                    ))}
+                    <span className="text-xs font-mono text-ink-400 ml-1">
+                      {answer.points_earned}/{q.points} pts
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-mono px-2 py-1 rounded ${answer.is_correct ? 'bg-green-700/10 text-green-700' : 'bg-crimson-500/10 text-crimson-500'}`}>
+                      {answer.is_correct ? '✓ Correcta' : '✗ Incorrecta'}
+                    </span>
+                    <span className="text-xs font-mono text-ink-400">
+                      {answer.points_earned}/{q.points} pts
+                    </span>
+                  </div>
+                )}
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      <div className="p-6 pt-0 border-t border-parchment-200 mt-4 flex justify-between items-center">
+        <div>
+          <span className="text-sm font-body text-ink-600">Calificación actual: </span>
+          <span className="font-display text-2xl font-bold text-ink-900">{selectedSession.score}</span>
+          <span className="font-mono text-ink-400">/100</span>
+        </div>
+        <button
+          onClick={() => setSelectedSession(null)}
+          className="bg-ink-800 text-parchment-100 px-5 py-2.5 rounded-sm font-body font-medium hover:bg-ink-900 transition-colors"
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 export default function TeacherReports() {
   const { profile } = useAuth()
   const [rows, setRows] = useState<ReportRow[]>([])
@@ -26,6 +122,10 @@ export default function TeacherReports() {
   const [assignments, setAssignments] = useState<any[]>([])
   const [selectedAssignment, setSelectedAssignment] = useState('all')
   const [loading, setLoading] = useState(true)
+  const [selectedSession, setSelectedSession] = useState<any | null>(null)
+  const [sessionAnswers, setSessionAnswers] = useState<any[]>([])
+  const [loadingAnswers, setLoadingAnswers] = useState(false)
+  const [savingScore, setSavingScore] = useState<string | null>(null)
 
   useEffect(() => {
     if (!profile?.id) return
@@ -74,6 +174,29 @@ export default function TeacherReports() {
     }
     load()
   }, [profile?.id])
+  async function loadSessionAnswers(sessionId: string) {
+    setLoadingAnswers(true)
+    const { data } = await supabase
+      .from('student_answers')
+      .select('*, question:questions(*)')
+      .eq('session_id', sessionId)
+      .order('answered_at')
+    setSessionAnswers(data ?? [])
+    setLoadingAnswers(false)
+  }
+
+  async function gradeOpenAnswer(answerId: string, questionPoints: number, multiplier: number) {
+  setSavingScore(answerId)
+  const pointsEarned = Math.round(questionPoints * multiplier)
+  await supabase
+    .from('student_answers')
+    .update({ points_earned: pointsEarned, is_correct: multiplier > 0 })
+    .eq('id', answerId)
+  // Reload answers to reflect changes
+  const sessionId = sessionAnswers.find(a => a.id === answerId)?.session_id
+  if (sessionId) await loadSessionAnswers(sessionId)
+  setSavingScore(null)
+  }
 
   useEffect(() => {
     if (selectedAssignment === 'all') {
@@ -210,7 +333,7 @@ export default function TeacherReports() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-sepia-100 border-b border-parchment-200">
-                  {['Estudiante', 'Correo', 'Actividad / Tema', 'Grupo', 'Inicio', 'Duración', 'Calificación', 'Estado'].map(h => (
+                  {['Estudiante', 'Correo', 'Actividad / Tema', 'Grupo', 'Inicio', 'Duración', 'Calificación', 'Estado', 'Ver detalle'].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-mono uppercase tracking-wider text-ink-500 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -233,11 +356,22 @@ export default function TeacherReports() {
                       <span className={`font-mono font-bold text-base ${scoreColor(r.score)}`}>{r.score}</span>
                       <span className="text-ink-400 font-mono text-xs">/100</span>
                     </td>
-                    <td className="px-4 py-3">
+                   <td className="px-4 py-3">
                       <span className={`text-xs font-mono px-2 py-1 rounded ${r.is_completed ? 'bg-green-700/10 text-green-700' : 'bg-gold-400/20 text-gold-600'}`}>
                         {r.is_completed ? 'Completada' : 'En progreso'}
                       </span>
                     </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => {
+                          setSelectedSession(r)
+                          loadSessionAnswers(r.session_id)
+                        }}
+                        className="text-xs text-crimson-500 hover:text-crimson-600 font-body font-medium underline"
+                      >
+                        Ver detalle
+                      </button>
+                    </td> 
                   </tr>
                 ))}
               </tbody>
