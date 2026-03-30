@@ -31,6 +31,8 @@ export default function AuthCallback() {
     .eq('email', email)
     .single()
 
+  console.log('teacher query result:', teacher, 'error:', error)
+
   if (teacher) {
     await supabase.from('profiles').update({ role: 'teacher' }).eq('email', email)
     window.location.href = '/teacher'
