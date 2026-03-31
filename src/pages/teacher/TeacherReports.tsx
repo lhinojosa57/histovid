@@ -243,6 +243,7 @@ export default function TeacherReports() {
       </div>
 
       {activeTab === 'general' && (
+      <div>  
       <div className="flex items-center gap-3 mb-6">
         <Filter className="w-4 h-4 text-ink-400" />
         <select
@@ -255,7 +256,7 @@ export default function TeacherReports() {
         </select>
         <span className="text-sm text-ink-400 font-body">{filtered.length} registros</span>
       </div>
-
+        
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
           { label: 'Promedio general', value: `${avgScore}/100`, icon: TrendingUp, color: 'bg-gold-400/20 text-gold-600' },
@@ -355,6 +356,7 @@ export default function TeacherReports() {
           </div>
         )}
       </div>
+    </div>
     </div>
     )}
 
