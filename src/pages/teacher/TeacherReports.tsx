@@ -30,6 +30,10 @@ export default function TeacherReports() {
   const [selectedSession, setSelectedSession] = useState<any | null>(null)
   const [sessionAnswers, setSessionAnswers] = useState<any[]>([])
   const [loadingAnswers, setLoadingAnswers] = useState(false)
+  const [activeTab, setActiveTab] = useState<'general' | 'matrix'>('general')
+  const [matrixData, setMatrixData] = useState<any>(null)
+  const [loadingMatrix, setLoadingMatrix] = useState(false)
+  const [selectedMatrixAssignment, setSelectedMatrixAssignment] = useState('')
   const [savingScore, setSavingScore] = useState<string | null>(null)
 
   useEffect(() => {
@@ -136,6 +140,42 @@ export default function TeacherReports() {
     return `${m}m ${s % 60}s`
   }
 
+  async function loadMatrixData(assignmentId: string) {
+  setLoadingMatrix(true)
+  
+  // Get questions for this assignment
+  const { data: questions } = await supabase
+    .from('questions')
+    .select('*')
+    .eq('assignment_id', assignmentId)
+    .order('timestamp_seconds')
+
+  // Get all sessions for this assignment
+  const { data: sessions } = await supabase
+    .from('student_sessions')
+    .select('*, profile:profiles!student_id(full_name, email)')
+    .eq('assignment_id', assignmentId)
+    .order('started_at')
+
+  // Get all answers for these sessions
+  const sessionIds = (sessions ?? []).map((s: any) => s.id)
+  const { data: answers } = await supabase
+    .from('student_answers')
+    .select('*')
+    .in('session_id', sessionIds)
+
+  // Build matrix: { studentId: { questionId: answer } }
+  const answerMap: Record<string, Record<string, any>> = {}
+  ;(answers ?? []).forEach((a: any) => {
+    const session = (sessions ?? []).find((s: any) => s.id === a.session_id)
+    if (!session) return
+    if (!answerMap[session.student_id]) answerMap[session.student_id] = {}
+    answerMap[session.student_id][a.question_id] = a
+  })
+
+  setMatrixData({ questions: questions ?? [], sessions: sessions ?? [], answerMap })
+  setLoadingMatrix(false)
+}
   const scoreDistribution = [
     { range: '0-20', count: filtered.filter(r => r.score <= 20).length },
     { range: '21-40', count: filtered.filter(r => r.score > 20 && r.score <= 40).length },

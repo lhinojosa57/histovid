@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
-import { Plus, Video, Edit2, Trash2, Eye, EyeOff, Users } from 'lucide-react'
+import { Plus, Video, Edit2, Trash2, Eye, EyeOff, Users, Copy } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -112,6 +112,16 @@ export default function TeacherAssignments() {
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex items-center justify-end gap-2">
+                     <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${window.location.origin}/student/watch/${a.id}`)
+                          alert('¡Liga copiada! Pégala en Google Classroom.')
+                        }}
+                      className="text-ink-400 hover:text-gold-500 transition-colors p-1.5 rounded hover:bg-sepia-100"
+                      title="Copiar liga para estudiantes"
+                  >
+                        <Copy className="w-4 h-4" />
+                      </button>
                       <Link to={`/teacher/assignments/${a.id}/edit`} className="text-ink-400 hover:text-gold-500 transition-colors p-1.5 rounded hover:bg-sepia-100">
                         <Edit2 className="w-4 h-4" />
                       </Link>

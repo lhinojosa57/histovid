@@ -129,7 +129,7 @@ export default function WatchVideo() {
     setActivityState('paused_question')
 
     if (questionTimerRef.current) clearInterval(questionTimerRef.current)
-    const limit = q.question_type === 'open' ? 30 : 10
+    const limit = q.question_type === 'open' ? 30 : 20
     let elapsed = 0
     questionTimerRef.current = setInterval(() => {
       elapsed++
@@ -395,7 +395,7 @@ function QuestionOverlay({ question, currentAnswer, onAnswer, onSubmit, submitti
         <span className="text-parchment-200 text-xs font-mono">{question.points} pts</span>
       </div>
 
-      <div className="p-5">
+      <div className="p-5" style={{ userSelect: 'none' }}>
         <p className="font-display text-lg font-semibold text-ink-800 mb-5 leading-snug">
           {question.question_text}
         </p>
