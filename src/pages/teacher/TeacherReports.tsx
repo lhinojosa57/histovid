@@ -226,7 +226,23 @@ export default function TeacherReports() {
           Exportar CSV
         </button>
       </div>
+      {/* Tabs */}
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => setActiveTab('general')}
+          className={`px-4 py-2 rounded-sm font-body text-sm font-medium transition-colors ${activeTab === 'general' ? 'bg-ink-800 text-parchment-100' : 'bg-parchment-50 border border-parchment-300 text-ink-600 hover:bg-sepia-100'}`}
+        >
+          Vista general
+        </button>
+        <button
+          onClick={() => setActiveTab('matrix')}
+          className={`px-4 py-2 rounded-sm font-body text-sm font-medium transition-colors ${activeTab === 'matrix' ? 'bg-ink-800 text-parchment-100' : 'bg-parchment-50 border border-parchment-300 text-ink-600 hover:bg-sepia-100'}`}
+        >
+          Reporte por preguntas
+        </button>
+      </div>
 
+      {activeTab === 'general' && (
       <div className="flex items-center gap-3 mb-6">
         <Filter className="w-4 h-4 text-ink-400" />
         <select
@@ -340,8 +356,113 @@ export default function TeacherReports() {
         )}
       </div>
     </div>
-    
-{/* Modal de detalle por estudiante */}
+    )}
+
+    {activeTab === 'matrix' && (
+      <div className="bg-parchment-50 rounded-sm shadow-manuscript border border-parchment-200 p-6">
+        <div className="flex items-center gap-4 mb-6">
+          <h2 className="font-display text-lg font-semibold text-ink-800">Reporte por preguntas</h2>
+          <select
+            value={selectedMatrixAssignment}
+            onChange={e => {
+              setSelectedMatrixAssignment(e.target.value)
+              if (e.target.value) loadMatrixData(e.target.value)
+            }}
+            className="border border-parchment-300 rounded px-3 py-2 text-sm font-body text-ink-700 bg-white focus:outline-none focus:border-gold-400"
+          >
+            <option value="">Seleccionar actividad…</option>
+            {assignments.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
+          </select>
+        </div>
+
+        {loadingMatrix ? (
+          <div className="text-center py-10">
+            <div className="spinner mx-auto mb-3" />
+            <p className="text-ink-500 font-body text-sm">Cargando reporte…</p>
+          </div>
+        ) : !matrixData ? (
+          <div className="text-center py-10 text-ink-400 font-body">
+            Selecciona una actividad para ver el reporte.
+          </div>
+        ) : matrixData.sessions.length === 0 ? (
+          <div className="text-center py-10 text-ink-400 font-body">
+            Ningún estudiante ha iniciado esta actividad.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-sepia-100 border-b border-parchment-200">
+                  <th className="text-left px-4 py-3 text-xs font-mono uppercase tracking-wider text-ink-500 whitespace-nowrap sticky left-0 bg-sepia-100">
+                    Estudiante
+                  </th>
+                  {matrixData.questions.map((q: any, i: number) => (
+                    <th key={q.id} className="px-3 py-3 text-xs font-mono text-ink-500 text-center whitespace-nowrap">
+                      P{i + 1}
+                    </th>
+                  ))}
+                  <th className="px-4 py-3 text-xs font-mono uppercase tracking-wider text-ink-500 text-center whitespace-nowrap">
+                    Cal.
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-parchment-200">
+                {matrixData.sessions.map((session: any) => (
+                  <tr key={session.id} className="hover:bg-sepia-100/40 transition-colors">
+                    <td className="px-4 py-3 font-body text-ink-800 whitespace-nowrap sticky left-0 bg-parchment-50">
+                      <p className="font-medium">{session.profile?.full_name ?? 'Desconocido'}</p>
+                      <p className="text-xs text-ink-400">{session.profile?.email}</p>
+                    </td>
+                    {matrixData.questions.map((q: any) => {
+                      const answer = matrixData.answerMap[session.student_id]?.[q.id]
+                      let circle = '⚪' // no answer / time up
+                      let title = 'Sin respuesta'
+                      if (answer) {
+                        if (q.question_type === 'open') {
+                          if (answer.points_earned > 0) {
+                            circle = '🟢'
+                            title = 'Respuesta abierta calificada'
+                          } else if (answer.answer_text) {
+                            circle = '🟡'
+                            title = 'Pendiente de calificar'
+                          } else {
+                            circle = '⚪'
+                            title = 'Sin respuesta'
+                          }
+                        } else {
+                          circle = answer.is_correct ? '🟢' : '🔴'
+                          title = answer.is_correct ? 'Correcta' : 'Incorrecta'
+                        }
+                      }
+                      return (
+                        <td key={q.id} className="px-3 py-3 text-center text-lg" title={title}>
+                          {circle}
+                        </td>
+                      )
+                    })}
+                    <td className="px-4 py-3 text-center">
+                      <span className={`font-mono font-bold text-sm ${session.score >= 80 ? 'text-green-700' : session.score >= 60 ? 'text-gold-600' : 'text-crimson-500'}`}>
+                        {Math.round(session.score ?? 0)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Legend */}
+            <div className="flex items-center gap-4 mt-4 pt-4 border-t border-parchment-200 text-xs font-body text-ink-500">
+              <span>🟢 Correcta</span>
+              <span>🔴 Incorrecta</span>
+              <span>⚪ Sin respuesta</span>
+              <span>🟡 Abierta pendiente</span>
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+
+    {/* Modal de detalle por estudiante */}
     {selectedSession && (
       <div className="fixed inset-0 bg-ink-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className="bg-parchment-50 rounded-sm shadow-raised w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-parchment-200 animate-slide-up">
