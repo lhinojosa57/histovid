@@ -8,12 +8,13 @@ type ActivityState = 'playing' | 'paused_question' | 'time_up'
 
 // ─── URL helpers ──────────────────────────────────────────────────────────────
 
-function getEmbedUrl(url: string, autoplay: boolean): string {
+function getEmbedUrl(url: string, autoplay: boolean, startSecond = 0): string {
   const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/)
   if (ytMatch) {
+    const start = startSecond > 0 ? `&start=${startSecond}` : ''
     const params = autoplay
-      ? '?autoplay=1&rel=0&modestbranding=1&iv_load_policy=3&controls=0'
-      : '?autoplay=0&rel=0&modestbranding=1&iv_load_policy=3&controls=0'
+      ? `?autoplay=1&rel=0&modestbranding=1&iv_load_policy=3&controls=0${start}`
+      : `?autoplay=0&rel=0&modestbranding=1&iv_load_policy=3&controls=0${start}`
     return `https://www.youtube-nocookie.com/embed/${ytMatch[1]}` + params
   }
   return url
@@ -48,6 +49,7 @@ export default function WatchVideo() {
   const [loading, setLoading] = useState(true)
   const [completed, setCompleted] = useState(false)
   const [finalScore, setFinalScore] = useState(0)
+  const [pausedAtSecond, setPausedAtSecond] = useState(0)
 
   // ── Load data ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -114,8 +116,10 @@ export default function WatchVideo() {
     return () => clearInterval(interval)
   }, [session, completed])
 
-  // ── Trigger question ───────────────────────────────────────────────────────
+ // ── Trigger question ───────────────────────────────────────────────────────
   const triggerQuestion = useCallback((q: Question, videoUrl: string) => {
+    const currentSecond = Math.floor(videoSecondsRef.current)
+    setPausedAtSecond(currentSecond)
     if (iframeRef.current) {
       iframeRef.current.src = getEmbedUrl(videoUrl, false)
     }
@@ -225,7 +229,7 @@ export default function WatchVideo() {
   setCurrentAnswer('')
 
   if (iframeRef.current && assignment?.video_url) {
-    iframeRef.current.src = getEmbedUrl(assignment.video_url, true)
+    iframeRef.current.src = getEmbedUrl(assignment.video_url, true, pausedAtSecond)
   }
 
   startVideoTimer(questions, newAnswered, assignment?.video_url ?? '')
